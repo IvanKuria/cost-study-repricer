@@ -93,3 +93,15 @@ describe('repricing', () => {
     expect(t.summary.cpiShare).toBeGreaterThan(0); expect(t.summary.cpiShare).toBeLessThan(1);
   });
 });
+
+it('keeps the separate fuel and repair sources behind combined adjustment factors', () => {
+  const study = load(ALMOND);
+  const table = repriceStudy(study, { layout: 'production' });
+  const cell = table.rows.find(r => r.cells.fuelLubeRepairs?.parts?.filter(p => (p.original ?? 0) > 0).length === 2)!.cells.fuelLubeRepairs;
+  expect(cell.parts!.reduce((sum, p) => sum + (p.original ?? 0), 0)).toBeCloseTo(cell.original!, 8);
+  expect(cell.parts!.reduce((sum, p) => sum + (p.repriced ?? 0), 0)).toBeCloseTo(cell.repriced!, 8);
+  for (const part of cell.parts!) {
+    expect(part.seriesId).toBeTruthy();
+    expect(part.repriced).toBeCloseTo(part.original! * part.indexTo! / part.indexFrom!, 8);
+  }
+});

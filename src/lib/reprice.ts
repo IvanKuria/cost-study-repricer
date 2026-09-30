@@ -109,6 +109,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     const fFuel = F(c.fuel), fRep = F(c.lubeRepairs);
     const flr: RepricedCell = o.fuel == null && o.lubeRepairs == null ? cellFrom(null, c.fuel, fFuel) : {
       ...cellFrom(fuelPart + repairPart, c.fuel, fFuel),
+      parts: [cellFrom(o.fuel, c.fuel, fFuel), cellFrom(o.lubeRepairs, c.lubeRepairs, fRep)],
       repriced: fuelPart * (fFuel.factor ?? 1) + repairPart * (fRep.factor ?? 1),
       seriesId: repairPart > 0 && fRep.seriesId !== fFuel.seriesId ? `${fFuel.seriesId}+${fRep.seriesId}` : fFuel.seriesId,
     };

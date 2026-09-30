@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import type { RepricedCell, RepricedRow, RepricedTable, Series, StudyPick } from '@/lib/types';
 import { fmt, fmtHrs } from '@/lib/exportShared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { FactorSource } from './FactorSource';
 import { cn } from '@/lib/utils';
 
 export type View = 'today' | 'study' | 'both';
@@ -88,13 +89,13 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
         <table className="w-full min-w-[1100px] text-[13px] border-collapse">
           <thead>
             <tr className="border-b border-ink align-bottom">
-              <th className="text-left font-normal text-ink-2 py-1 pr-2 sticky left-0 bg-ground z-10 min-w-[180px]">Operation</th>
+              <th className="text-left font-normal text-ink-2 py-1 pr-2 md:sticky md:left-0 bg-ground z-10 min-w-[180px]">Operation</th>
               {(showTime || hasTime) && <th className="text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line">{'Time\n(Hrs/A)'}</th>}
               {cols.map(c => <Fragment key={c.key}>{factorColumn(c.key) && <th className="text-right font-normal text-ink-2 py-1 px-2">{!isProd && `Year ${c.label.match(/\d+/)?.[0] ?? c.label} `}Adjustment factor</th>}<th className="text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line">{isProd ? c.label.replace(' & ', ' &\n').replace('/ ', '/\n') : `Year ${c.label.match(/\d+/)?.[0] ?? c.label}`}</th></Fragment>)}
             </tr>
           </thead>
           <tbody>
-            {table.yieldRow && <tr className="border-b border-line text-ink-2"><td className="py-1 pr-2 sticky left-0 bg-ground z-10">{table.yieldRow.label}</td>{cols.map((c, i) => <Fragment key={c.key}>{factorColumn(c.key) && <td />}<td className="text-right px-2 tnum">{table.yieldRow!.values[i] == null ? '—' : fmt(table.yieldRow!.values[i])}</td></Fragment>)}</tr>}
+            {table.yieldRow && <tr className="border-b border-line text-ink-2"><td className="py-1 pr-2 md:sticky md:left-0 bg-ground z-10">{table.yieldRow.label}</td>{cols.map((c, i) => <Fragment key={c.key}>{factorColumn(c.key) && <td />}<td className="text-right px-2 tnum">{table.yieldRow!.values[i] == null ? '—' : fmt(table.yieldRow!.values[i])}</td></Fragment>)}</tr>}
             {table.rows.map(r => {
               if (r.kind === 'blank') return <tr key={r.id} className="h-3"><td colSpan={columnCount} /></tr>;
               if (r.kind === 'heading') return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5 font-bold">{r.label}</td></tr>;
@@ -102,14 +103,14 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
               const editable = r.kind === 'operation' || r.kind === 'overheadItem' || r.kind === 'returns' || r.kind === 'interest';
               return (
                 <tr key={r.id} className={cn('align-top', (r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net') && 'border-t border-line-strong', (r.kind === 'total' || r.kind === 'net') && 'font-bold')}>
-                  <td className={cn('py-[3px] pr-2 sticky left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>{view === 'study' ? r.label : r.displayLabel ?? r.label}</td>
+                  <td className={cn('py-[3px] pr-2 md:sticky md:left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>{view === 'study' ? r.label : r.displayLabel ?? r.label}</td>
                   {(showTime || hasTime) && <td className="py-[3px] px-2 text-right tnum">{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
                   {cols.map(c => {
                     const cell = r.cells[c.key];
                     const factorable = (r.kind === 'operation' || r.kind === 'overheadItem') && cell?.original != null && cell.original > 0 && cell.factor != null;
                     const key = r.kind === 'returns' && !isProd ? `income:${c.key}` : `${r.id}:${c.key}`;
                     return <Fragment key={c.key}>
-                      {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} onChange={value => onFactor(key, value)} /> : '—'}</td>}
+                      {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /> : '—'}</td>}
                       <td className="py-[3px] px-2 text-right">{editable && !factorable && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
                     </Fragment>;
                   })}
@@ -123,18 +124,16 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
   );
 }
 
-function FactorInput({ cell, label, onChange }: { cell: RepricedCell; label: string; onChange: (value: number | null) => void }) {
+function FactorInput({ cell, label, source, onChange }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <div className="flex min-w-[180px] flex-wrap items-center justify-end gap-2">
-    <input type="range" aria-label={`Adjustment factor slider for ${label}`} min="0" max={Math.max(3, Math.ceil(cell.factor ?? 1))} step="0.01"
-      className="w-[90px] min-h-11 md:min-h-7 cursor-pointer accent-accent"
-      value={cell.factor ?? 1} onChange={e => { setDraft(null); onChange(Number(e.target.value)); }} />
+  return <div className="flex min-w-[124px] flex-wrap items-center justify-end gap-2">
     <input aria-label={`Adjustment factor for ${label}`} type="number" min="0" step="0.01" inputMode="decimal"
       className="w-[78px] h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] md:text-[13px] tnum"
       value={draft ?? (cell.factor ?? 1).toFixed(4)}
       onChange={e => setDraft(e.target.value)}
       onBlur={() => { if (draft !== null) { const n = Number(draft); if (draft === '') onChange(null); else if (Number.isFinite(n) && n >= 0 && draft !== (cell.factor ?? 1).toFixed(4)) onChange(n); setDraft(null); } }}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+    {source}
     {cell.overridden && <button className="min-h-11 md:min-h-7 text-xs text-accent underline" onClick={() => { setDraft(null); onChange(null); }}>Reset</button>}
   </div>;
 }

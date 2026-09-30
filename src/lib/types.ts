@@ -35,6 +35,7 @@ export interface RepriceSettings {
 
 /** One cell of a UC table: the study's value and how it was repriced. */
 export interface RepricedCell {
+  parts?: RepricedCell[]; // Separate source amounts for a combined fuel/repairs cell.
   autoFactor?: number | null;
   factorOverridden?: boolean;
   note?: string | null;
