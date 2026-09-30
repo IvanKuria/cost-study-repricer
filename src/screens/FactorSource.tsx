@@ -36,7 +36,7 @@ export function FactorSource({ row, column, table, series, study }: { row: Repri
   const originalSum = components.reduce((sum, c) => sum + (row.cells[c.key].original ?? 0), 0);
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverTrigger asChild><button type="button" aria-label={`Adjustment source for ${row.label}, ${column}`} className="inline-flex h-11 w-11 md:h-7 md:w-7 shrink-0 items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-accent"><span aria-hidden="true" className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-current font-serif text-xs font-bold">i</span></button></PopoverTrigger>
-    <PopoverContent aria-label={`Adjustment source: ${row.label}`} className="w-[420px] max-w-[calc(100vw-24px)] max-h-[min(600px,80dvh)] overflow-y-auto bg-ground p-4 text-left text-[13px] font-normal text-ink" collisionPadding={12}>
+    <PopoverContent aria-label={`Adjustment source: ${row.label}`} className="w-[420px] max-w-[calc(100vw-24px)] max-h-[min(600px,80dvh,var(--radix-popover-content-available-height))] overflow-y-auto bg-ground p-4 text-left text-[13px] font-normal text-ink" collisionPadding={12}>
       <div className="flex items-start justify-between gap-2"><h3 className="font-semibold">{row.label}</h3><button type="button" aria-label="Close adjustment source" onClick={() => setOpen(false)} className="min-h-7 px-2 text-ink-2">Close</button></div>
       <p>Automatic factor: <strong>{number(automatic)}</strong></p>
       {cell.overridden && <p>Your {cell.factorOverridden ? 'factor' : 'cost'} edit is active. Current factor: <strong>{number(cell.factor)}</strong>. Reset restores the automatic calculation.</p>}

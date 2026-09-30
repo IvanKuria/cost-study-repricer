@@ -126,7 +126,7 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
 
 function FactorInput({ cell, label, source, onChange }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <div className="flex min-w-[124px] flex-wrap items-center justify-end gap-2">
+  return <div className="flex min-w-[140px] flex-wrap items-center justify-end gap-2">
     <input aria-label={`Adjustment factor for ${label}`} type="number" min="0" step="0.01" inputMode="decimal"
       className="w-[78px] h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] md:text-[13px] tnum"
       value={draft ?? (cell.factor ?? 1).toFixed(4)}
