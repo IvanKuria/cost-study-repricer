@@ -56,3 +56,15 @@ describe('the lender screen over the real engine', () => {
     expect((await buildWorkbook(table, meta)).byteLength).toBeGreaterThan(3000);
   });
 });
+
+it('PDF sources appendix is optional and both versions retain a clickable link', async () => {
+  const table = repriceStudy(study, { targetPeriod: target });
+  const meta = { study: null, series: SERIES, interestRate: null, interestSource: '', acres: 1, mappingNotes: [], sourcesUrl: 'https://example.test/repricer/?section=sources' };
+  const compact = new TextDecoder().decode(await buildPdf(table, meta));
+  const full = new TextDecoder().decode(await buildPdf(table, meta, { includeDetails: true }));
+  expect(compact).toContain('/Subtype /Link');
+  expect(compact).toContain(meta.sourcesUrl);
+  expect(full).toContain(meta.sourcesUrl);
+  expect(full.length).toBeGreaterThan(compact.length);
+  expect(compact).not.toContain('How each line was repriced');
+});

@@ -1544,7 +1544,7 @@
     },
     {
      "label": "INCOME FROM PRODUCTION",
-     "kind": "overheadItem",
+     "kind": "income",
      "section": "Cash Overhead Costs",
      "values": [
       0,
@@ -1768,7 +1768,7 @@
     },
     {
      "label": "INCOME FROM PRODUCTION",
-     "kind": "overheadItem",
+     "kind": "income",
      "section": "Non-Cash Overhead Costs",
      "values": [
       null,

@@ -53,6 +53,8 @@ export function rowCategory(label: string, section: string): CellClass {
   if (s.includes('non-cash') || s.includes('noncash')) return { category: 'nonCashOverhead', confidence: 'column' };
   if (s.includes('cash overhead')) return { category: 'cashOverhead', confidence: 'column' };
   if (has(label, ['interest on operating'])) return { category: 'operatingInterest', confidence: 'column' };
+  if (has(label, ['removal', 'remove', 'leveling', 'soil analysis', 'pca fee']) || /harvest/i.test(section)) return { category: 'custom', confidence: 'keyword' };
+  if (/^rip\b/i.test(label) || has(label, ['pickup truck', 'atv', 'disk', 'mow', 'shred'])) return { category: 'fuelLubeRepairs', confidence: 'keyword', part: 'fuel' };
   if (has(label, POLLINATION)) return { category: 'pollination', confidence: 'keyword' };
   if (has(label, FERTILIZER)) return { category: 'fertilizer', confidence: 'keyword' };
   if (has(label, PESTICIDES)) return { category: 'pesticides', confidence: 'keyword' };

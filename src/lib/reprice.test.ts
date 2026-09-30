@@ -21,8 +21,25 @@ describe('series', () => {
 
 describe('repricing', () => {
   const study = load(ALMOND);
-  it('reference period is the study\'s stated price month', () => {
-    expect(referencePeriod(study, DEFAULT_SETTINGS).period).toBe('2024-01');
+  study.establishment = null; // These tests exercise the production table.
+  it('applies an exact factor, updates component totals, accepts zero and restores the automatic index', () => {
+    const base = repriceStudy(study);
+    const row = base.rows.find(r => r.label.startsWith('Fertigate: UAN32'))!;
+    const key = `${row.id}:materials`;
+    for (const factor of [1.234567, 0]) {
+      const edited = repriceStudy(study, { factorOverrides: { [key]: factor } });
+      const current = edited.rows.find(r => r.id === row.id)!;
+      expect(current.cells.materials.repriced).toBeCloseTo(row.cells.materials.original! * factor, 8);
+      expect(current.cells.materials.factorOverridden).toBe(true);
+      expect(current.cells.total.repriced).toBeCloseTo(['labor', 'materials', 'custom', 'fuelLubeRepairs'].reduce((sum, k) => sum + (current.cells[k].repriced ?? 0), 0), 8);
+      expect(current.cells.total.factor).toBeCloseTo(current.cells.total.repriced! / current.cells.total.original!, 8);
+    }
+    const reset = repriceStudy(study, { factorOverrides: {} });
+    expect(reset.rows.find(r => r.id === row.id)!.cells.materials.repriced).toBe(row.cells.materials.repriced);
+    for (const factor of [-1, NaN, Infinity]) expect(repriceStudy(study, { factorOverrides: { [key]: factor } }).rows.find(r => r.id === row.id)!.cells.materials.repriced).toBe(row.cells.materials.repriced);
+  });
+  it('reference period is June of the study year', () => {
+    expect(referencePeriod(study, DEFAULT_SETTINGS).period).toBe('2024-06');
   });
   it('applies original x index(target) / index(reference) on a fertilizer cell', () => {
     const t = repriceStudy(study);
@@ -30,7 +47,7 @@ describe('repricing', () => {
     const row = t.rows.find(r => r.label.startsWith('Fertigate: UAN32'))!;
     const c = row.cells.materials;
     expect(c.seriesId).toBe('nass.fertilizer');
-    const from = lookup(fert, '2024-01')!.value, to = lookup(fert, t.targetPeriod)!.value;
+    const from = lookup(fert, '2024-06')!.value, to = lookup(fert, t.targetPeriod)!.value;
     expect(c.factor).toBeCloseTo(to / from, 6);
     expect(c.repriced).toBeCloseTo((c.original as number) * to / from, 6);
     expect(t.targetPeriod).toBe(latestPeriod(SERIES));

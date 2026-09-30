@@ -1,8 +1,8 @@
 # Cost study repricer
 
 Reprices a UC Davis cost and return study to a target month for agricultural lenders. Every number
-shown is one of three things: printed in the study, computed from a named public price series, or
-typed by the lender. Nothing is estimated any other way.
+shown comes from the study, a named price series, an explicitly documented calculation, or a lender edit.
+Establishment rows combine inputs; their whole-row index classification is an approximation, disclosed in the calculation notes.
 
 ## Formula
 
@@ -12,9 +12,8 @@ For each line of the study's table:
 repriced = original × index(target period) ÷ index(reference period)
 ```
 
-- **Reference period** is the month and year the study says its prices are for ("based on January 2024
-  figures"), read from the study text. When a study gives only a year, June of that year is used
-  (the professor's rule). When it says "current figures", its title year is used.
+- **Reference period** is June of the study's title year, following the professor's explicit convention.
+  The study's stated price month is retained in the source data but does not override that convention.
 - **Target period** is the latest month available in the series, or one the lender picks.
 - A series that has no value for a month (quarterly series, a month not yet published) uses the
   nearest earlier month, and the cell says so.
@@ -22,7 +21,8 @@ repriced = original × index(target period) ÷ index(reference period)
   way: each month's cumulative operating cost carries the monthly rate through the last harvest month,
   using the study's own monthly table. Without a monthly table, the study's interest is scaled by the
   rate ratio and flagged. Without a lender's rate, the study's interest scales with its operating cost.
-- **Returns** are not repriced. The lender can type a price.
+- **Returns** are not indexed. For establishment tables, a lender can change the sale price per unit
+  (multiplied by each printed yield), or override each year's income. Repeated income rows stay synchronized.
 
 ## Which series reprices what
 
@@ -71,9 +71,10 @@ row totals), table grapes other materials and custom (his footnoted splits), wal
 For every commodity with two parsed studies at least five years apart in the same region, the older
 study is repriced to the newer study's reference period and compared per category with the newer
 study. This measures how much of the change between two studies is price and how much is practice,
-yield, scale or the study authors' choices. Median absolute errors over 46 pairs are around 20 to 40
-percent per category and 19 percent on the total, so indexing explains the direction of change but a
-lender should read the repriced number as a starting point, not a forecast.
+yield, scale or the study authors' choices. With the June reference convention, median absolute errors over 46 pairs are about 21 percent
+on the total, and 47 to 105 percent by category. Some pairs contain parser artifacts; these figures
+are diagnostic, not evidence of predictive accuracy. A lender should treat a repriced study as a
+starting point for review, not a forecast.
 
 ## Layout
 
@@ -81,3 +82,44 @@ The engine returns the study's own table shape (`RepricedTable`): production tab
 cultural, harvest, assessment and post-harvest blocks, interest, cash overhead items, non-cash
 overhead and totals; establishment tables with one column per year when the parser provides
 `establishment.table`. Non-cash overhead is one line when the parser has not itemized it.
+
+## Running and validating
+
+`npm run dev -- --host 127.0.0.1` serves the tool on port 5174, under `/cost-study-repricer/`.
+The initial screen loads the 2024 San Joaquin Valley South almond establishment table. Studies
+from 2010 onward are selectable; older files remain available to the shared parser.
+`npm test`, `npm run build`, and `npm run lint` validate the app.
+
+## Establishment calculations and exports
+
+The shared parser now supplies 74 row-by-row establishment tables. Fourteen carry subtotal
+reconciliation warnings; see each study's `parse.warnings`. The 2024 almond study's second-year
+cultural total is $183 above the sum of its printed rows. The original figures are preserved.
+
+Each subtotal is its printed value plus changes in its components. The original difference between
+printed totals and rounded/parsed components stays unindexed, and each affected cell documents it.
+This avoids inventing a cost category for a discrepancy. Annual cash cost combines operating costs
+and cash overhead; total annual cost adds non-cash overhead. Accumulated net cost is cumulative
+cost less income across the year columns. Income changes do not change the cost subtotals.
+
+Establishment operating interest scales the printed interest by repriced/original operating outlay
+and lender/study rate. This is an approximation: a production-year monthly table is not a valid
+cash schedule for the establishment years. A missing study rate is disclosed instead of silently
+claiming the lender rate was applied. The summary labels identify the last displayed year's annual
+cost, and peak cash need uses the accumulated **cash** cost row, excluding non-cash overhead.
+
+All year cells for operations, overhead, interest and income are editable. A separate toggle opens
+the production table. Sale price defaults to the price printed in the establishment table, falling back to the study's
+parsed unit-price assumption when needed. A missing source price stays blank and is labeled.
+Reset edits restores indexed values and the study price; clearing sale price also restores study income.
+Study-dollar view retains the original figures even after edits.
+
+The establishment PDF uses portrait letter pages, Times type, the source's year columns, yield row,
+row order and source-page breaks. Repricing is labeled, edits carry an asterisk, and sources and
+calculation notes follow the table. It is an adapted worksheet, not a facsimile issued by UC Davis.
+The workbook includes original/repriced values and factors for each year, highlights edited cells,
+and carries cell comments and calculation notes on its Sources sheet.
+
+Tests cover the actual almond, Lodi wine-grape and walnut tables: unchanged-price identity, first-year
+edit propagation, rate changes, income and sale-price edits, annual versus accumulated summaries,
+and finite values and row preservation across all 74 establishment tables.

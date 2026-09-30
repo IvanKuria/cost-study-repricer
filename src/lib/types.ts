@@ -22,6 +22,10 @@ export interface Series {
 export interface CategoryMapping { category: Category; seriesId: string; fallbackSeriesId?: string; note: string }
 
 export interface RepriceSettings {
+  factorOverrides?: Record<string, number>;
+  summaryColumn?: string;
+  layout?: 'production' | 'establishment';
+  pricePerUnit?: number | null;
   targetPeriod: string;           // 'YYYY-MM', default the latest month common to the series used
   referenceMonth: number;         // 1..12, default 6 (June of the study's price year)
   interestRate: number | null;    // yearly rate for operating interest; null keeps the study's own
@@ -31,6 +35,9 @@ export interface RepriceSettings {
 
 /** One cell of a UC table: the study's value and how it was repriced. */
 export interface RepricedCell {
+  autoFactor?: number | null;
+  factorOverridden?: boolean;
+  note?: string | null;
   original: number | null;
   category: Category | null;
   seriesId: string | null;
@@ -43,6 +50,7 @@ export interface RepricedCell {
 
 /** One row of the study's table, in the study's own column layout. */
 export interface RepricedRow {
+  displayLabel?: string;          // updated rate label for repriced views; label remains the source wording
   id: string;
   label: string;                  // as printed, e.g. 'Fumigate (Flat - TIF Tarped)'
   kind: 'operation' | 'subtotal' | 'total' | 'overheadItem' | 'interest' | 'returns' | 'net' | 'blank' | 'heading';
@@ -54,6 +62,9 @@ export interface RepricedRow {
 }
 
 export interface RepricedTable {
+  notes?: string[];
+  yieldRow?: { label: string; values: (number | null)[] } | null;
+  summaryColumn?: string;
   studyId: string;
   title: string;                  // e.g. 'COSTS PER ACRE TO PRODUCE AND HARVEST ORGANIC STRAWBERRIES' or 'COSTS PER ACRE TO ESTABLISH AN ALMOND ORCHARD'
   layout: 'production' | 'establishment';

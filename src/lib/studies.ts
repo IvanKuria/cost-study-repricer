@@ -19,7 +19,7 @@ export async function loadStudy(id: string): Promise<ParsedStudy> {
 /** Studies a lender can pick: English, with a parsed costs table. Newest first within a commodity. */
 export function studyPicks(rows: IndexRow[] = STUDY_INDEX): StudyPick[] {
   return rows
-    .filter(r => r.language === 'en' && r.operations > 0 && r.year)
+    .filter(r => r.language === 'en' && r.operations > 0 && r.year && r.year >= 2010)
     .map(r => ({ id: r.id, commodity: r.commodity, title: r.title, year: r.year as number, priceYear: r.priceYear, priceMonth: null, region: r.region ?? '', description: r.description ?? '', url: r.url, hasEstablishment: r.hasEstablishment }))
     .sort((a, b) => a.commodity.localeCompare(b.commodity) || b.year - a.year || a.region.localeCompare(b.region));
 }

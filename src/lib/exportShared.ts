@@ -2,6 +2,7 @@ import type { RepricedRow, RepricedTable, Series, StudyPick } from './types';
 import { MONTHS } from '@/ui';
 
 export interface ExportMeta {
+  sourcesUrl?: string;
   study: StudyPick | null;
   series: Series[];
   interestRate: number | null;
@@ -25,13 +26,13 @@ export function shown(row: RepricedRow, col: string): number | null {
 /** Plain-words sentence under the table and in the export footer. */
 export function repricingSentence(table: RepricedTable, meta: ExportMeta): string {
   const yr = meta.study?.year ?? table.referencePeriod.slice(0, 4);
-  const withIndex = table.summary.coverage.filter(c => c.seriesId !== 'bls.cpi' && c.category !== 'operatingInterest' && c.share > 0).map(c => c.category);
+  const withIndex = [...new Set(table.summary.coverage.filter(c => c.seriesId.startsWith('nass.') && c.share > 0).map(c => c.category))];
   const names: Record<string, string> = { labor: 'labor', fuelLubeRepairs: 'fuel, lube and repairs', fertilizer: 'fertilizer', pesticides: 'pesticides', nonCashOverhead: 'machinery', custom: 'custom work', water: 'water', pollination: 'pollination', otherMaterials: 'other materials', cashOverhead: 'cash overhead', operatingInterest: 'operating interest' };
   const list = withIndex.map(c => names[c] ?? c);
   const indexed = list.length ? `${list.join(', ')} use USDA prices-paid indexes` : 'no line matched a USDA prices-paid index';
   const cpi = `${Math.round(table.summary.cpiShare * 100)} percent of cost used the consumer price index because no producer index applies`;
-  const rate = meta.interestRate !== null ? `operating interest at ${(meta.interestRate * 100).toFixed(2)} percent from the ${meta.interestSource}` : "operating interest at the study's own rate";
-  const edits = table.rows.some(r => Object.values(r.cells).some(c => c.overridden)) ? ' Your Cost edits are marked.' : '';
+  const rate = meta.interestRate !== null ? `operating interest at ${(meta.interestRate * 100).toFixed(2)} percent (${meta.interestSource})` : "operating interest at the study's own rate";
+  const edits = table.rows.some(r => Object.values(r.cells).some(c => c.overridden)) ? ' Edited values are marked.' : '';
   return `Repriced from the ${yr} study (prices as of ${periodText(table.referencePeriod)}) to ${periodText(table.targetPeriod)}. ${indexed[0].toUpperCase()}${indexed.slice(1)}; ${cpi}; ${rate}.${edits}`;
 }
 
@@ -42,7 +43,7 @@ export function hasOverrides(table: RepricedTable): boolean {
 /** Peak cash need per acre for an establishment table: the largest value on the accumulated net cash cost row. */
 export function peakCash(table: RepricedTable): { value: number; column: string } | null {
   if (table.layout !== 'establishment') return null;
-  const row = table.rows.find(r => /accumulated/i.test(r.label));
+  const row = table.rows.find(r => /accumulated.*cash/i.test(r.label));
   if (!row) return null;
   let best: { value: number; column: string } | null = null;
   for (const col of table.columns) {

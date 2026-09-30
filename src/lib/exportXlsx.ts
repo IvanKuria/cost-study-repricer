@@ -1,7 +1,7 @@
 import type { RepricedTable } from './types';
 import { periodText, repricingSentence, type ExportMeta } from './exportShared';
 
-/** One sheet with the study table (original, factor, repriced, your cost per column) and a Sources sheet. */
+/** One sheet with the study table (original, factor, and adjusted cost per column) and a Sources sheet. */
 export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Promise<Uint8Array> {
   const { default: ExcelJS } = await import('exceljs');
   const book = new ExcelJS.Workbook();
@@ -15,18 +15,21 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   const columns = table.columns.filter(c => c.key !== 'timeHrs');
   const header: string[] = ['Operation', ...(isProd ? ['Time (Hrs/A)'] : [])];
   for (const c of columns) header.push(`${c.label} (study)`, `${c.label} factor`, `${c.label} (today)`);
-  header.push('Your Cost');
   const h = ws.addRow(header); h.font = { bold: true }; h.alignment = { wrapText: true, vertical: 'bottom' };
   h.eachCell(cell => { cell.border = { bottom: { style: 'thin' } }; });
-  const totalCol = isProd ? 'total' : columns[columns.length - 1]?.key;
+  if (table.yieldRow) {
+    const values: (string | number | null)[] = [table.yieldRow.label];
+    for (const v of table.yieldRow.values) values.push(v, null, v);
+    ws.addRow(values);
+  }
   for (const r of table.rows) {
     if (r.kind === 'blank') { ws.addRow([]); continue; }
     const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || r.kind === 'returns';
-    const vals: (string | number | null)[] = [caps ? r.label.toUpperCase() : r.kind === 'heading' ? r.label : `  ${r.label}`];
+    const label = r.displayLabel ?? r.label;
+    const vals: (string | number | null)[] = [caps ? label.toUpperCase() : r.kind === 'heading' ? label : `  ${label}`];
     if (isProd) vals.push((timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs) ?? null);
     if (r.kind !== 'heading') {
       for (const c of columns) { const cell = r.cells[c.key]; vals.push(cell?.original ?? null, cell?.factor ?? null, cell?.repriced ?? null); }
-      vals.push(r.kind === 'operation' || r.kind === 'overheadItem' ? r.cells[totalCol]?.repriced ?? null : null);
     }
     const row = ws.addRow(vals);
     if (caps || r.kind === 'heading') row.font = { bold: true };
@@ -35,7 +38,13 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
       const label = header[col - 1] ?? '';
       if (label.endsWith('factor')) cell.numFmt = '0.000';
       else if (typeof cell.value === 'number') cell.numFmt = '#,##0;[Red]-#,##0';
-      if (label === 'Your Cost' && r.cells[totalCol]?.overridden) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
+    });
+    columns.forEach((c, i) => {
+      const data = r.cells[c.key];
+      if (!data) return;
+      const target = row.getCell((isProd ? 3 : 2) + i * 3 + 2);
+      if (data.overridden) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
+      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.note ?? ''].filter(Boolean).join('\n');
     });
   }
   ws.addRow([]);
@@ -44,11 +53,14 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
 
   const src = book.addWorksheet('Sources');
   src.addRow(['What', 'Source', 'Unit', 'Latest period', 'Link']).font = { bold: true };
-  if (meta.study) src.addRow([`Study: ${meta.study.title}`, `${meta.study.region}, ${meta.study.year}`, '', meta.study.priceYear ? `prices as of ${meta.study.priceYear}` : '', meta.study.url]);
+  if (meta.study) src.addRow([`Source study: UC Davis, ${meta.study.title}`, `${meta.study.region}, ${meta.study.year}`, '', meta.study.priceYear ? `prices as of ${meta.study.priceYear}` : '', meta.study.url]);
   for (const s of meta.series) src.addRow([s.name, s.source, s.unit, periodText(s.lastPeriod), s.url]);
   src.addRow([]);
   src.addRow(['Line category', 'Series', 'Note']).font = { bold: true };
   for (const m of meta.mappingNotes) src.addRow([m.label, m.series, m.note]);
+  src.addRow([]);
+  src.addRow(['Calculation notes and study discrepancies']).font = { bold: true };
+  for (const note of table.notes ?? []) src.addRow([note]);
   [44, 40, 18, 18, 60].forEach((w, i) => { src.getColumn(i + 1).width = w; });
   return new Uint8Array(await book.xlsx.writeBuffer());
 }

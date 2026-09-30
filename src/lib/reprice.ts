@@ -1,4 +1,4 @@
-import type { OperationRow, ParsedStudy } from '../data/studySchema';
+import type { EstablishmentTable, OperationRow, ParsedStudy } from '../data/studySchema';
 import type { Category, CategoryMapping, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
@@ -6,21 +6,24 @@ import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
 
 export const DEFAULT_SETTINGS: RepriceSettings = { targetPeriod: '', referenceMonth: 6, interestRate: null, overrides: {}, mapping: DEFAULT_MAPPING };
 
-/** Optional establishment table shape the sibling parser will add; every field defensive. */
-interface EstablishmentTable { columns: string[]; rows: { label: string; section?: string; kind?: RepricedRow['kind']; values: (number | null)[]; page?: number; quote?: string }[] }
+/** Prefer the establishment table's stated price over the production assumptions. Never invent a missing price. */
+export function studySalePrice(study: ParsedStudy | null): number | null {
+  if (!study) return null;
+  const printed = study.establishment?.table?.yieldRow?.label.match(/\$\s*(\d[\d,]*(?:\.\d+)?)/);
+  const value = printed ? Number(printed[1].replace(/,/g, '')) : study.assumptions.pricePerUnit?.value;
+  return value != null && Number.isFinite(value) && value >= 0 ? value : null;
+}
 
 export interface Factor { seriesId: string | null; indexFrom: number | null; indexTo: number | null; factor: number | null; note: string | null }
 
 const SECTION_LABEL: Record<OperationRow['category'], string> = { cultural: 'Cultural', harvest: 'Harvest', assessment: 'Assessment', postharvest: 'Postharvest', other: 'Other' };
 const round = (n: number | null) => (n == null ? null : Math.round(n));
 
-/** Reference period: the study's stated price year and month, else the study year with the settings' reference month (June). */
+/** Professor's reference convention: June of the study year, even when its prose names another price month. */
 export function referencePeriod(study: ParsedStudy, settings: RepriceSettings): { period: string; note: string } {
-  const py = study.source.priceYear;
-  const year = py?.value ?? study.source.year ?? study.source.indexYear ?? new Date().getFullYear();
-  const month = py?.month ?? settings.referenceMonth;
-  const note = py ? `Study prices are for ${py.month ? `month ${py.month} of ` : ''}${py.value}: "${py.quote}"` : `Study does not state a price year; its ${year} title year with month ${settings.referenceMonth} is used.`;
-  return { period: periodKey(year, month), note };
+  const year = study.source.year ?? study.source.priceYear?.value ?? study.source.indexYear;
+  if (!year) throw new Error('This study has no reference year.');
+  return { period: periodKey(year, settings.referenceMonth), note: `Reference is month ${settings.referenceMonth} of the ${year} study, following the professor's June convention.` };
 }
 
 /** The series and factor for one classified cell. Seeds use the seeds index when present; combined fuel columns use fuels. */
@@ -44,7 +47,7 @@ export function factorFor(cls: CellClass, from: string, to: string, mapping: Cat
 
 function cellFrom(original: number | null, cls: CellClass | null, f: Factor | null): RepricedCell {
   const repriced = original == null ? null : f?.factor == null ? original : original * f.factor;
-  return { original, category: cls?.category ?? null, seriesId: f?.seriesId ?? null, indexFrom: f?.indexFrom ?? null, indexTo: f?.indexTo ?? null, factor: f?.factor ?? null, repriced, overridden: false };
+  return { original, category: cls?.category ?? null, seriesId: f?.seriesId ?? null, indexFrom: f?.indexFrom ?? null, indexTo: f?.indexTo ?? null, factor: f?.factor ?? null, note: f?.note, repriced, overridden: false };
 }
 const plainCell = (original: number | null, repriced: number | null, category: Category | null = null): RepricedCell => ({ original, category, seriesId: null, indexFrom: null, indexTo: null, factor: original && repriced != null ? repriced / original : null, repriced, overridden: false });
 const sumCells = (rows: RepricedRow[], col: string): RepricedCell => plainCell(
@@ -75,17 +78,24 @@ export function repriceStudy(study: ParsedStudy, settingsIn: Partial<RepriceSett
   const ref = referencePeriod(study, settings);
   const target = settings.targetPeriod || latestPeriod(series);
   const F = (cls: CellClass) => factorFor(cls, ref.period, target, settings.mapping, series);
-  const est = (study.establishment as (typeof study.establishment & { table?: EstablishmentTable }) | null | undefined)?.table;
-  const table = est && est.columns?.length && est.rows?.length
+  const est = study.establishment?.table;
+  const table = settings.layout !== 'production' && est && est.years.length && est.rows.length
     ? establishmentLayout(study, est, settings, ref.period, target, F)
     : productionLayout(study, settings, ref.period, target, F);
   return table;
 }
 
 function applyOverride(row: RepricedRow, col: string, settings: RepriceSettings) {
+  const cell = row.cells[col];
+  if (!cell) return;
+  cell.autoFactor = cell.factor;
+  const factor = settings.factorOverrides?.[`${row.id}:${col}`];
+  if (factor !== undefined && Number.isFinite(factor) && factor >= 0 && cell.original != null && cell.original > 0 && (row.kind === 'operation' || row.kind === 'overheadItem')) {
+    row.cells[col] = { ...cell, factor, repriced: cell.original * factor, overridden: true, factorOverridden: true };
+  }
   const v = settings.overrides[`${row.id}:${col}`] ?? (col === 'total' ? settings.overrides[row.id] : undefined);
-  if (v === undefined || !row.cells[col]) return;
-  row.cells[col] = { ...row.cells[col], repriced: v, overridden: true, factor: row.cells[col].original ? v / (row.cells[col].original as number) : null };
+  if (v === undefined || !Number.isFinite(v)) return;
+  row.cells[col] = { ...row.cells[col], repriced: v, overridden: true, factorOverridden: false, factor: cell.original ? v / cell.original : null };
 }
 
 function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): RepricedTable {
@@ -115,7 +125,8 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     const row: RepricedRow = { id: `op-${i}`, label: o.name, kind: 'operation', section: SECTION_LABEL[o.category], timeHrs: o.timeHrsPerAcre, cells, page: o.page, quote: o.quote };
     for (const col of Object.keys(cells)) applyOverride(row, col, settings);
     if (row.cells.total.overridden === false && ['labor', 'fuelLubeRepairs', 'materials', 'custom'].some(k => row.cells[k].overridden)) {
-      row.cells.total = { ...row.cells.total, repriced: ['labor', 'fuelLubeRepairs', 'materials', 'custom'].reduce((s, k) => s + (row.cells[k].repriced ?? 0), 0) };
+      const repriced = ['labor', 'fuelLubeRepairs', 'materials', 'custom'].reduce((s, k) => s + (row.cells[k].repriced ?? 0), 0);
+      row.cells.total = { ...row.cells.total, repriced, factor: origTotal ? repriced / origTotal : null };
     }
     opRows.push(row);
     const list = bySection.get(o.category) ?? []; list.push(row); bySection.set(o.category, list);
@@ -192,7 +203,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   }
 
   return {
-    studyId: study.source.id, title: study.source.title, layout: 'production',
+    studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production',
     columns: [{ key: 'timeHrs', label: 'Time (Hrs/A)' }, ...PROD_COLUMNS],
     rows, referencePeriod: ref, targetPeriod: target,
     summary: summarize(rows, totalOrig, totalRep, (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0)),
@@ -200,51 +211,128 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
 }
 
 function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): RepricedTable {
-  const cols = est.columns.map((label, i) => ({ key: `y${i + 1}`, label }));
+  const cols = est.years.map((label, i) => ({ key: `y${i + 1}`, label }));
   const rows: RepricedRow[] = [];
-  let section = '';
-  const detail: RepricedRow[] = [];
+  const notes = new Set<string>([
+    'Establishment rows combine inputs. Each whole row uses the category inferred from its label; labor, materials and machinery are not separately priced in this table.',
+    'Printed subtotal differences are retained, unindexed. Repriced totals equal the printed total plus changes in its underlying rows; original study figures remain unchanged.',
+    ...study.parse.warnings.filter(w => /establishment table/.test(w)),
+  ]);
+  const details: RepricedRow[] = [];
+  const totals = new Map<string, RepricedRow>();
+  const incomeCells: Record<string, RepricedCell> = {};
+  const sum = (rs: RepricedRow[], c: string, field: 'original' | 'repriced') => rs.reduce((v, r) => v + (r.cells[c]?.[field] ?? 0), 0);
+  const isCash = (r: RepricedRow) => /cash overhead/i.test(r.section) && !/non[- ]?cash/i.test(r.section);
+  const isNoncash = (r: RepricedRow) => /non[- ]?cash|capital recovery|interest on investment/i.test(r.section);
+  const amount = (key: string, col: string, field: 'original' | 'repriced') => totals.get(key)?.cells[col]?.[field] ?? 0;
+  const deltaTotal = (original: number | null, before: number, after: number): RepricedCell => {
+    const delta = after - before;
+    return plainCell(original, original === null && Math.abs(delta) < 1e-8 ? null : (original ?? 0) + delta);
+  };
+  let sectionDetails: RepricedRow[] = [];
   est.rows.forEach((r, i) => {
-    if (r.section) section = r.section;
-    const kind = r.kind ?? (/^total|accumulated|net cash/i.test(r.label) ? 'total' : 'operation');
-    if (kind === 'operation' || kind === 'overheadItem' || kind === 'interest') {
-      const cls = rowCategory(r.label, section);
-      const f = F(cls);
-      const cells: Record<string, RepricedCell> = {};
-      cols.forEach((c, k) => { cells[c.key] = cellFrom(r.values[k] ?? null, cls, f); });
-      const row: RepricedRow = { id: `e-${i}`, label: r.label, kind, section, timeHrs: null, cells, page: r.page ?? null, quote: r.quote ?? null };
-      for (const c of cols) applyOverride(row, c.key, settings);
-      rows.push(row); detail.push(row);
-    } else if (kind === 'heading' || kind === 'blank') {
-      rows.push({ id: `e-${i}`, label: r.label, kind, section, timeHrs: null, cells: {}, page: null, quote: null });
-    } else {
-      // Printed totals are recomputed from the repriced detail rows above them since the last total.
-      const start = rows.length - 1; let j = start; const group: RepricedRow[] = [];
-      while (j >= 0 && rows[j].kind !== 'total' && rows[j].kind !== 'subtotal') { if (rows[j].cells && Object.keys(rows[j].cells).length) group.unshift(rows[j]); j--; }
-      const cells: Record<string, RepricedCell> = {};
-      cols.forEach((c, k) => { const s = sumCells(group, c.key); cells[c.key] = { ...s, original: r.values[k] ?? s.original }; });
-      rows.push({ id: `e-${i}`, label: r.label, kind: kind === 'subtotal' ? 'subtotal' : 'total', section, timeHrs: null, cells, page: r.page ?? null, quote: r.quote ?? null });
-    }
+    const kind: RepricedRow['kind'] = r.kind === 'income' ? 'returns' : r.kind === 'accumulated' ? 'total' : r.kind;
+    const row: RepricedRow = { id: `e-${i}`, label: r.label, kind, section: r.section, timeHrs: null, cells: {}, page: r.page, quote: r.quote };
+    if (kind === 'heading') { sectionDetails = []; rows.push(row); return; }
+    const L = r.label.toUpperCase();
+    let totalKey: string | null = null;
+    if (/^TOTAL OPERATING/.test(L)) totalKey = 'operating';
+    else if (/^TOTAL CASH OVERHEAD/.test(L)) totalKey = 'cashOh';
+    else if (/^TOTAL (NON[- ]?CASH|CAPITAL RECOVERY|INTEREST ON INVESTMENT)/.test(L)) totalKey = 'noncash';
+    else if (/^TOTAL CASH COST/.test(L)) totalKey = 'cash';
+    else if (/^TOTAL COST(?:S)?(?:\/ACRE| PER ACRE| FOR THE YEAR)/.test(L)) totalKey = 'total';
+    const noncashNet = /TOTAL/.test(L) || (!/CASH/.test(L) && isNoncash(row));
+    cols.forEach((c, k) => {
+      const original = r.values[k] ?? null;
+      if (kind === 'operation' || kind === 'overheadItem') {
+        const cls = rowCategory(r.label, r.section);
+        row.cells[c.key] = cellFrom(original, cls, F(cls));
+        applyOverride(row, c.key, settings);
+      } else if (kind === 'interest') {
+        const ops = details.filter(d => d.kind === 'operation');
+        const before = sum(ops, c.key, 'original'), after = sum(ops, c.key, 'repriced');
+        const printedRate = r.label.match(/(?:@|at|:)\s*([\d.]+)\s*%/i);
+        const studyRate = printedRate ? Number(printedRate[1]) / 100 : (study.assumptions.operatingInterestRatePct?.value ?? 0) / 100;
+        if (settings.interestRate != null && studyRate > 0) row.displayLabel = `Interest On Operating Capital @ ${(settings.interestRate * 100).toFixed(2)}%`;
+        const rateRatio = settings.interestRate == null ? 1 : studyRate > 0 ? settings.interestRate / studyRate : 1;
+        const note = studyRate > 0 || settings.interestRate == null
+          ? 'Establishment interest scales by the change in operating costs and the lender rate divided by the printed study rate; no year-specific monthly schedule is available.'
+          : 'The study has no usable operating rate; the lender rate cannot be applied. Interest scales only with operating costs.';
+        notes.add(note);
+        row.cells[c.key] = { ...plainCell(original, original == null ? null : original * (before > 0 ? after / before : 1) * rateRatio, 'operatingInterest'), note };
+        applyOverride(row, c.key, settings);
+      } else if (kind === 'returns') {
+        if (!incomeCells[c.key]) {
+          const yieldValue = est.yieldRow?.values[k];
+          const rep = settings.pricePerUnit != null && yieldValue != null ? yieldValue * settings.pricePerUnit : original;
+          incomeCells[c.key] = plainCell(original, rep);
+          const v = settings.overrides[`income:${c.key}`];
+          if (v != null) incomeCells[c.key] = { ...incomeCells[c.key], repriced: v, overridden: true };
+        }
+        const income = incomeCells[c.key];
+        row.cells[c.key] = { ...income, ...deltaTotal(original, income.original ?? 0, income.repriced ?? 0), overridden: income.overridden };
+      } else if (r.kind === 'accumulated') {
+        const key = /CASH/.test(L) ? 'cash' : 'total';
+        let before = 0, after = 0;
+        for (const prev of cols.slice(0, k + 1)) {
+          before += amount(key, prev.key, 'original') - (incomeCells[prev.key]?.original ?? 0);
+          after += amount(key, prev.key, 'repriced') - (incomeCells[prev.key]?.repriced ?? 0);
+        }
+        row.cells[c.key] = deltaTotal(original, before, after);
+      } else if (kind === 'net') {
+        const key = noncashNet ? 'total' : 'cash';
+        const before = amount(key, c.key, 'original') - (incomeCells[c.key]?.original ?? 0);
+        const after = amount(key, c.key, 'repriced') - (incomeCells[c.key]?.repriced ?? 0);
+        const profit = /PROFIT|RETURNS|INCOME/.test(L);
+        const paired = est.rows.some(x => x.kind === 'net' && x.section === r.section && /COST/.test(x.label) && !/PROFIT|RETURNS|INCOME/.test(x.label));
+        const expected = profit ? (paired ? Math.max(0, -before) : -before) : before;
+        if (original != null && Math.abs(original - expected) > Math.max(3, Math.abs(original) * 0.02)) notes.add(`${r.label}, ${c.label}: the printed net figure differs from cost less income. Its original difference is preserved.`);
+        if (profit && paired && !(original != null && original < 0)) {
+          row.cells[c.key] = deltaTotal(original, Math.max(0, -before), Math.max(0, -after));
+        } else if (!profit && est.rows.some(x => x.kind === 'net' && x.section === r.section && /PROFIT|RETURNS|INCOME/.test(x.label))) {
+          row.cells[c.key] = deltaTotal(original, Math.max(0, before), Math.max(0, after));
+        } else row.cells[c.key] = deltaTotal(original, profit ? -before : before, profit ? -after : after);
+      } else {
+        let group = sectionDetails;
+        if (totalKey === 'operating') group = details.filter(d => d.kind === 'operation' || d.kind === 'interest');
+        if (totalKey === 'cashOh') group = details.filter(isCash);
+        if (totalKey === 'noncash') group = details.filter(isNoncash);
+        if (totalKey === 'cash') group = ['operating', 'cashOh'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []);
+        if (totalKey === 'total') group = ['cash', 'noncash'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []);
+        const before = sum(group, c.key, 'original'), after = sum(group, c.key, 'repriced');
+        row.cells[c.key] = deltaTotal(original, before, after);
+        const residual = original == null ? 0 : original - before;
+        if (residual) row.cells[c.key].note = `Printed total differs from its parsed components by $${residual.toLocaleString('en-US')}; this difference is retained without indexing.`;
+        if (Math.abs(residual) > Math.max(3, Math.abs(original ?? 0) * 0.02)) notes.add(`${r.label}, ${c.label}: printed total differs from its parsed components by $${residual.toLocaleString('en-US')}.`);
+      }
+    });
+    if (totalKey) totals.set(totalKey, row);
+    if (kind === 'operation' || kind === 'overheadItem' || kind === 'interest') { details.push(row); sectionDetails.push(row); }
+    rows.push(row);
   });
-  const last = cols.at(-1)!.key;
-  const totalRow = [...rows].reverse().find(r => r.kind === 'total');
-  const totalOrig = totalRow?.cells[last]?.original ?? null, totalRep = totalRow?.cells[last]?.repriced ?? null;
-  return { studyId: study.source.id, title: study.source.title, layout: 'establishment', columns: cols, rows, referencePeriod: ref, targetPeriod: target, summary: summarize(detail, totalOrig, totalRep, null) };
+  const last = cols.find(c => c.key === settings.summaryColumn) ?? cols.at(-1)!;
+  const totalRow = totals.get('total') ?? totals.get('cash');
+  return {
+    studyId: study.source.id, title: est.title, layout: 'establishment', columns: cols, rows,
+    referencePeriod: ref, targetPeriod: target, notes: [...notes], yieldRow: est.yieldRow && { ...est.yieldRow, label: settings.pricePerUnit != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${settings.pricePerUnit.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
+    summary: summarize(details, totalRow?.cells[last.key]?.original ?? null, totalRow?.cells[last.key]?.repriced ?? null, totals.get('cash')?.cells[last.key]?.repriced ?? null),
+  };
 }
 
 function summarize(rows: RepricedRow[], totalOrig: number | null, totalRep: number | null, cashRep: number | null): RepricedTable['summary'] {
-  const byCat = new Map<Category, { orig: number; series: string }>();
+  const byCat = new Map<string, { category: Category; orig: number; series: string }>();
   let all = 0;
   for (const r of rows) {
     if (r.kind !== 'operation' && r.kind !== 'overheadItem' && r.kind !== 'interest') continue;
     for (const [k, c] of Object.entries(r.cells)) {
       if (k === 'total' && Object.keys(r.cells).length > 1) continue;
       if (!c.category || !c.original) continue;
-      const cur = byCat.get(c.category) ?? { orig: 0, series: c.seriesId ?? '' };
-      cur.orig += c.original; if (!cur.series && c.seriesId) cur.series = c.seriesId; byCat.set(c.category, cur); all += c.original;
+      const key = `${c.category}:${c.seriesId ?? ''}`;
+      const cur = byCat.get(key) ?? { category: c.category, orig: 0, series: c.seriesId ?? '' };
+      cur.orig += c.original; if (!cur.series && c.seriesId) cur.series = c.seriesId; byCat.set(key, cur); all += c.original;
     }
   }
-  const coverage = [...byCat].map(([category, v]) => ({ category, share: all ? v.orig / all : 0, seriesId: v.series })).sort((a, b) => b.share - a.share);
+  const coverage = [...byCat.values()].map(v => ({ category: v.category, share: all ? v.orig / all : 0, seriesId: v.series })).sort((a, b) => b.share - a.share);
   const cpiShare = coverage.filter(c => c.seriesId === 'bls.cpi').reduce((s, c) => s + c.share, 0);
   return { totalPerAcreOriginal: round(totalOrig), totalPerAcreRepriced: round(totalRep), cashPerAcreRepriced: round(cashRep), coverage, cpiShare };
 }
