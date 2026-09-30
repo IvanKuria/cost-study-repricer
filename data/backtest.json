@@ -1,0 +1,1017 @@
+{
+ "generatedAt": "2026-09-30",
+ "pairs": [
+  {
+   "commodity": "alfalfa",
+   "region": "intermountain siskiyou",
+   "oldId": "alfalfa-alfalfa-im-butte-2012",
+   "newId": "alfalfa-2020alfalfascottvalley-mixed-irrigation-1",
+   "oldYear": 2012,
+   "newYear": 2020,
+   "errors": {
+    "labor": -0.5508659301283965,
+    "pesticides": -0.5719160460392688,
+    "fertilizer": -0.7652458123382815,
+    "water": -0.01334022423688016,
+    "custom": -0.5179462238414472,
+    "fuelLubeRepairs": -0.4354807791556691,
+    "operatingInterest": -0.5153088091371701,
+    "cashOverhead": -0.06872048261842292,
+    "nonCashOverhead": -0.12113079262837718,
+    "total": -0.3232758620689655
+   }
+  },
+  {
+   "commodity": "alfalfa",
+   "region": "intermountain siskiyou",
+   "oldId": "alfalfa-alfalfa-im-scott2012",
+   "newId": "alfalfa-2020alfalfascottvalley-mixed-irrigation-1",
+   "oldYear": 2012,
+   "newYear": 2020,
+   "errors": {
+    "labor": -0.3564646163033741,
+    "pesticides": -0.403276912660799,
+    "fertilizer": -0.3785918561895684,
+    "water": -0.01334022423688016,
+    "custom": -0.12771221457023757,
+    "fuelLubeRepairs": -0.41887727266024755,
+    "operatingInterest": -0.29629269898401284,
+    "cashOverhead": 0.10060306599640936,
+    "nonCashOverhead": 0.13079262837716932,
+    "total": -0.1103448275862069
+   }
+  },
+  {
+   "commodity": "alfalfa",
+   "region": "intermountain joaquin joaquin sacramento",
+   "oldId": "alfalfa-alfalfaorganicca2013",
+   "newId": "alfalfa-alfalfaorganiccadraft42021",
+   "oldYear": 2013,
+   "newYear": 2020,
+   "errors": {
+    "labor": -0.07439476260871232,
+    "pesticides": -0.20106749428737086,
+    "fertilizer": -0.4907856450048496,
+    "water": -0.714573598055454,
+    "custom": 0.4230552662175234,
+    "fuelLubeRepairs": -0.032048461276402485,
+    "operatingInterest": -0.07941957656118935,
+    "cashOverhead": -0.7095132462847699,
+    "nonCashOverhead": 0.9613294808192044,
+    "total": -0.10635619886721208
+   }
+  },
+  {
+   "commodity": "alfalfa",
+   "region": "joaquin sacramento",
+   "oldId": "alfalfa-alfalfa-flood-sv-2015",
+   "newId": "alfalfa-alfalfasvdraft10420",
+   "oldYear": 2015,
+   "newYear": 2020,
+   "errors": {
+    "labor": -0.11797326040717102,
+    "pesticides": 0.07628865979381444,
+    "fertilizer": -0.26578073089700993,
+    "water": -0.01869374771203882,
+    "custom": -0.0005214097067061848,
+    "otherMaterials": 0.09034028031995689,
+    "fuelLubeRepairs": 0.06034627255839313,
+    "operatingInterest": -0.045984722861916974,
+    "cashOverhead": -0.41093304335960773,
+    "nonCashOverhead": 1.3038404303180418,
+    "total": 0.14099783080260303
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-almondfloodvn2011",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2011,
+   "newYear": 2024,
+   "errors": {
+    "labor": 0.23094541910331384,
+    "pesticides": -0.12635444228567622,
+    "fertilizer": 0.18593665298536352,
+    "water": -0.9417725179757495,
+    "pollination": -0.0812997280618252,
+    "custom": -0.3583490267794732,
+    "otherMaterials": -1,
+    "fuelLubeRepairs": 0.1052935391456791,
+    "operatingInterest": -0.3854695214374852,
+    "cashOverhead": -0.28020641752069936,
+    "nonCashOverhead": -0.4379802675209421,
+    "total": -0.3502031340684852
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-almondsprinklevn2011",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2011,
+   "newYear": 2024,
+   "errors": {
+    "labor": 0.2668615984405457,
+    "pesticides": -0.15953085586976445,
+    "fertilizer": 0.07705413149539218,
+    "water": -0.7069216738112724,
+    "pollination": -0.0812997280618252,
+    "custom": -0.3583490267794732,
+    "otherMaterials": -1,
+    "fuelLubeRepairs": 0.008337965536409047,
+    "operatingInterest": -0.3694703638272198,
+    "cashOverhead": -0.21866966046936015,
+    "nonCashOverhead": -0.41421533818021034,
+    "total": -0.31909460243760884
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "sacramento",
+   "oldId": "almonds-almondsprinklesv2012",
+   "newId": "almonds-2024sacvalleyalmonds7-5-24-final-draft",
+   "oldYear": 2012,
+   "newYear": 2024,
+   "errors": {
+    "labor": 0.130592156862745,
+    "pesticides": -0.3914158434329513,
+    "fertilizer": -0.09939687963076574,
+    "water": -0.7406804116364255,
+    "pollination": 0.21038396717318836,
+    "custom": -0.015151686441347286,
+    "fuelLubeRepairs": 0.17342635167388626,
+    "operatingInterest": 0.33492476276845407,
+    "cashOverhead": -0.2668949313024749,
+    "nonCashOverhead": -0.5746178129638242,
+    "total": -0.3446153846153846
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-16almondorganicnsjvfinaldraft42716",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2016,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.17864923747276684,
+    "pesticides": 0.41551683389553734,
+    "fertilizer": 0.49742580022370997,
+    "water": -0.3788049575269637,
+    "pollination": 0.10538466204475136,
+    "custom": 0.021366448683647593,
+    "otherMaterials": 0.05223509933774846,
+    "fuelLubeRepairs": 0.050177669820527,
+    "operatingInterest": 0.1281322486281312,
+    "cashOverhead": -0.16934107038044388,
+    "nonCashOverhead": -0.6663211770865611,
+    "total": -0.3207196749854904
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-16almondssjvnorthfinaldraft81116",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2016,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.18997821350762534,
+    "pesticides": -0.6248630298863418,
+    "fertilizer": 0.2812619707950905,
+    "water": -0.3333959631941394,
+    "pollination": 0.38173082755593907,
+    "custom": -0.3636101358201888,
+    "otherMaterials": -0.03278842071084256,
+    "fuelLubeRepairs": 0.08532259889402742,
+    "operatingInterest": -0.17384600711057707,
+    "cashOverhead": -0.19028205179942426,
+    "nonCashOverhead": -0.4873971812324361,
+    "total": -0.3366221706326175
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "sacramento",
+   "oldId": "almonds-16almondsacvalfinaldraft81216",
+   "newId": "almonds-2024sacvalleyalmonds7-5-24-final-draft",
+   "oldYear": 2016,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.2922650392327813,
+    "pesticides": -0.33779579979422614,
+    "fertilizer": -0.0000309405940595185,
+    "water": -0.32287784700496114,
+    "pollination": 0.39667304654344526,
+    "custom": -0.34071313260412417,
+    "fuelLubeRepairs": -0.1323243145979192,
+    "operatingInterest": 0.19895542649667408,
+    "cashOverhead": -0.17690527005314785,
+    "nonCashOverhead": -0.5424061017975588,
+    "total": -0.3457692307692308
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-2019almondssjvnorth",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2019,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.806250695139584,
+    "pesticides": -0.24436322303117003,
+    "fertilizer": 0.47624078634179207,
+    "water": -0.3609352139960952,
+    "pollination": 0.15234539190545374,
+    "custom": -0.2260029972123292,
+    "otherMaterials": 0.20996266150072634,
+    "fuelLubeRepairs": -0.41188314790799263,
+    "operatingInterest": -0.2381380192419604,
+    "cashOverhead": -0.11749678680799515,
+    "nonCashOverhead": -0.1706480220249282,
+    "total": -0.19315147997678467
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "joaquin",
+   "oldId": "almonds-2019almondssjvsouth",
+   "newId": "almonds-almondssjvnorth-final-draft4",
+   "oldYear": 2019,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.6586576143953192,
+    "pesticides": 0.34709842770966143,
+    "fertilizer": 0.6731772625467646,
+    "water": 1.1667588435866898,
+    "pollination": 0.1473310056654733,
+    "custom": -0.3688181647683676,
+    "otherMaterials": -1,
+    "fuelLubeRepairs": -0.13069486904073344,
+    "operatingInterest": 0.2907053876414334,
+    "cashOverhead": -0.17350248867927628,
+    "nonCashOverhead": -0.18910763440680609,
+    "total": -0.04712710388856645
+   }
+  },
+  {
+   "commodity": "almonds",
+   "region": "sacramento",
+   "oldId": "almonds-2019sacvalleyalmonds",
+   "newId": "almonds-2024sacvalleyalmonds7-5-24-final-draft",
+   "oldYear": 2019,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.7619789789789789,
+    "pesticides": -0.17533971284353972,
+    "fertilizer": 0.2898418966717332,
+    "water": -0.3564428767756634,
+    "pollination": 0.15234539190545374,
+    "custom": -0.19297116147504345,
+    "fuelLubeRepairs": -0.47792621546369674,
+    "operatingInterest": 0.028375459354545354,
+    "cashOverhead": -0.12268568350400498,
+    "nonCashOverhead": -0.15544616142688267,
+    "total": -0.17833333333333334
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin",
+   "oldId": "beans-beansbabylimavn10",
+   "newId": "beans-2018garbanzobeansjvsouthfinaldraft3118",
+   "oldYear": 2010,
+   "newYear": 2018,
+   "errors": {
+    "labor": -0.5291563739800884,
+    "pesticides": 0.5868658607401153,
+    "fertilizer": 0.8202179901784645,
+    "water": -0.41242823401581047,
+    "custom": 0.8222538199844774,
+    "otherMaterials": -0.397910830961942,
+    "fuelLubeRepairs": -0.44161337924249877,
+    "operatingInterest": -0.07453297248126564,
+    "cashOverhead": 0.1000749305780681,
+    "nonCashOverhead": -0.7516675560298826,
+    "total": -0.12046543463381246
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin",
+   "oldId": "beans-beanslglimavn10",
+   "newId": "beans-2018garbanzobeansjvsouthfinaldraft3118",
+   "oldYear": 2010,
+   "newYear": 2018,
+   "errors": {
+    "labor": -0.48795755670334606,
+    "pesticides": 0.5868658607401153,
+    "fertilizer": 0.8202179901784645,
+    "water": -0.41242823401581047,
+    "custom": 0.962427190752514,
+    "otherMaterials": 0.24962630177630393,
+    "fuelLubeRepairs": -0.44161337924249877,
+    "operatingInterest": -0.005785663151412847,
+    "cashOverhead": 0.13873571088592346,
+    "nonCashOverhead": -0.7516675560298826,
+    "total": -0.034223134839151265
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin",
+   "oldId": "beans-beansvn2010",
+   "newId": "beans-2018garbanzobeansjvsouthfinaldraft3118",
+   "oldYear": 2010,
+   "newYear": 2018,
+   "errors": {
+    "labor": -0.5526985552810839,
+    "pesticides": 0.5868658607401153,
+    "fertilizer": 0.7602108036890646,
+    "water": -0.41242823401581047,
+    "custom": 0.6698914604540028,
+    "otherMaterials": -0.3665783890552527,
+    "fuelLubeRepairs": -0.5515986227250369,
+    "operatingInterest": -0.5369563322461608,
+    "cashOverhead": -0.008878177562251828,
+    "nonCashOverhead": -0.7861581732479545,
+    "total": -0.18548939082819987
+   }
+  },
+  {
+   "commodity": "broccoli",
+   "region": "benito cruz monterey santa",
+   "oldId": "broccoli-2017broccoli-final-5-25-2017",
+   "newId": "broccoli-2023-broccrowncut-full-final",
+   "oldYear": 2017,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.1567621854702253,
+    "pesticides": -0.1397108843537415,
+    "fertilizer": 0.409115384752538,
+    "water": 0.030738227868409504,
+    "custom": 0.08407796842081482,
+    "fuelLubeRepairs": -0.2658102950266564,
+    "operatingInterest": 0.005833646912563044,
+    "cashOverhead": 0.07282949300737233,
+    "nonCashOverhead": 0.03422314839105669,
+    "total": 0.05613070203817535
+   }
+  },
+  {
+   "commodity": "cherries",
+   "region": "joaquin",
+   "oldId": "cherries-cherryvn2011",
+   "newId": "cherries-cherry2017-nsjv-final-draft4",
+   "oldYear": 2011,
+   "newYear": 2017,
+   "errors": {
+    "labor": -0.2004365870064597,
+    "pesticides": 0.16437596226691784,
+    "fertilizer": 0.3935102986197876,
+    "water": 0.08368104054162245,
+    "pollination": -0.13305516756670208,
+    "custom": 14.35214807433965,
+    "otherMaterials": -0.20979409559436293,
+    "fuelLubeRepairs": -0.386809338521401,
+    "operatingInterest": -0.10394738372181521,
+    "cashOverhead": -0.3460881490976362,
+    "nonCashOverhead": -0.23712693186787803,
+    "total": -0.14908992121706058
+   }
+  },
+  {
+   "commodity": "grapes–wine",
+   "region": "joaquin joaquin sacramento",
+   "oldId": "grapes-wine-grapewinevn2012",
+   "newId": "grapes-wine-2021-winegrape-highwire-lodi-22522",
+   "oldYear": 2012,
+   "newYear": 2021,
+   "errors": {
+    "labor": 1.3600983796296302,
+    "pesticides": 0.05224277633389387,
+    "fertilizer": -0.7085644022602616,
+    "water": -0.3375577987176865,
+    "custom": -0.2902661448592046,
+    "otherMaterials": -0.24829538492873632,
+    "fuelLubeRepairs": -0.1950296869493858,
+    "operatingInterest": 0.5660144543324526,
+    "cashOverhead": 0.15600337585512902,
+    "nonCashOverhead": 0.04736125343403767,
+    "total": 0.07516679021497405
+   }
+  },
+  {
+   "commodity": "grapes–wine",
+   "region": "napa",
+   "oldId": "grapes-wine-winegrapenc2012",
+   "newId": "grapes-wine-2020napawinegrape",
+   "oldYear": 2012,
+   "newYear": 2020,
+   "errors": {
+    "labor": 0.15606070432583172,
+    "pesticides": -0.817968553022469,
+    "fertilizer": -0.8519197614749611,
+    "water": -0.11689872962689357,
+    "otherMaterials": -0.932078528603883,
+    "operatingInterest": -0.28807815234238,
+    "cashOverhead": -0.1922951221354587,
+    "nonCashOverhead": -0.28389880998637473,
+    "total": -0.26126332683709735
+   }
+  },
+  {
+   "commodity": "grapes–wine",
+   "region": "joaquin joaquin sacramento",
+   "oldId": "grapes-wine-2016grapewinelodifinaldraftmay192019",
+   "newId": "grapes-wine-2021-winegrape-highwire-lodi-22522",
+   "oldYear": 2016,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.880196139401034,
+    "pesticides": 0.0628409629981023,
+    "fertilizer": -0.3434403217239547,
+    "water": -0.6832865920075998,
+    "custom": -0.27969341151535637,
+    "otherMaterials": 0.05187240957475947,
+    "fuelLubeRepairs": -0.6249014329608178,
+    "operatingInterest": -0.20575243290774353,
+    "cashOverhead": 0.1560656130317782,
+    "nonCashOverhead": 0.12396740343826758,
+    "total": -0.08450704225352113
+   }
+  },
+  {
+   "commodity": "lemons",
+   "region": "joaquin",
+   "oldId": "lemons-lemonvs10",
+   "newId": "lemons-lemons-vs-2015",
+   "oldYear": 2010,
+   "newYear": 2015,
+   "errors": {
+    "labor": -0.06396801934963699,
+    "pesticides": 0.6053159478435306,
+    "fertilizer": -0.015521346184961966,
+    "water": 0.14300783365272624,
+    "custom": 0.3822504964605197,
+    "otherMaterials": -0.31774027775558494,
+    "fuelLubeRepairs": -0.3476973684210527,
+    "operatingInterest": 0.2815680225656736,
+    "cashOverhead": -0.3898568100851306,
+    "nonCashOverhead": -0.1263912181735022,
+    "total": 0.20750670241286864
+   }
+  },
+  {
+   "commodity": "lettuce",
+   "region": "benito cruz monterey santa",
+   "oldId": "lettuce-2015romainehearts-finaldraft-1-27-2016-1",
+   "newId": "lettuce-2023-romheartslettuce-full-final",
+   "oldYear": 2015,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.0650205890673624,
+    "pesticides": -0.2673005411615322,
+    "fertilizer": -0.0942825959197381,
+    "water": -0.44595895783097955,
+    "custom": -0.20898092303046872,
+    "fuelLubeRepairs": -0.1650585901498015,
+    "operatingInterest": -0.34014287239541013,
+    "cashOverhead": -0.00018762116577628616,
+    "nonCashOverhead": 0.030732749512830806,
+    "total": -0.17286964806764724
+   }
+  },
+  {
+   "commodity": "lettuce",
+   "region": "benito cruz monterey santa",
+   "oldId": "lettuce-2017headlettuce-final-5-25-2017",
+   "newId": "lettuce-2023-romheartslettuce-full-final",
+   "oldYear": 2017,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.08363965225509075,
+    "pesticides": -0.15941013824884798,
+    "fertilizer": 0.16565558822434776,
+    "water": -0.4607220096461672,
+    "custom": -0.09263529784054171,
+    "fuelLubeRepairs": -0.10847639849033525,
+    "operatingInterest": -0.2941616897901567,
+    "cashOverhead": 0.11334467025408129,
+    "nonCashOverhead": 0.59385063990803,
+    "total": -0.053534210683022686
+   }
+  },
+  {
+   "commodity": "olives",
+   "region": "sacramento",
+   "oldId": "olives-olivetablesv2011",
+   "newId": "olives-2016tableolivessacramentovalleyfinaldraftmar17",
+   "oldYear": 2011,
+   "newYear": 2016,
+   "errors": {
+    "labor": -0.3177524230155806,
+    "pesticides": 0.009902321258424919,
+    "fertilizer": -0.060891399874450886,
+    "water": -0.09764804616721381,
+    "custom": -0.9768159339174075,
+    "fuelLubeRepairs": 0.4213097110687969,
+    "operatingInterest": -1,
+    "cashOverhead": 0.2922983070876244,
+    "nonCashOverhead": -1,
+    "total": -0.6756379585326954
+   }
+  },
+  {
+   "commodity": "oranges",
+   "region": "joaquin",
+   "oldId": "oranges-oranges-vs-2015",
+   "newId": "oranges-2021orangessjvsouth",
+   "oldYear": 2015,
+   "newYear": 2021,
+   "errors": {
+    "labor": 0.0742386818823119,
+    "pesticides": -0.3996474611617645,
+    "fertilizer": -0.4086657918981547,
+    "water": 0.03981545978983452,
+    "custom": 0.09871603852182084,
+    "otherMaterials": -0.8073647732162609,
+    "fuelLubeRepairs": 0.6583541327655587,
+    "operatingInterest": 0.40405272035957185,
+    "cashOverhead": 0.31807490209545364,
+    "nonCashOverhead": 0.05464368520449649,
+    "total": 0.021413967502421177
+   }
+  },
+  {
+   "commodity": "peaches",
+   "region": "joaquin joaquin sacramento",
+   "oldId": "peaches-peachesearlysv2011",
+   "newId": "peaches-2017peachsvsjv-lcling",
+   "oldYear": 2011,
+   "newYear": 2017,
+   "errors": {
+    "labor": 3.6951129484718748,
+    "pesticides": -0.03906472985778389,
+    "fertilizer": -0.5515515515515516,
+    "water": -0.4891217951732352,
+    "custom": -0.6605536648686692,
+    "otherMaterials": -0.0006955636175773401,
+    "fuelLubeRepairs": -0.49313344014648663,
+    "operatingInterest": -0.2292888052540603,
+    "cashOverhead": -0.6617874499509987,
+    "nonCashOverhead": -0.23705509797508256,
+    "total": -0.24541258583811776
+   }
+  },
+  {
+   "commodity": "peaches",
+   "region": "joaquin joaquin sacramento",
+   "oldId": "peaches-peacheslatesv2011",
+   "newId": "peaches-2017peachsvsjv-lcling",
+   "oldYear": 2011,
+   "newYear": 2017,
+   "errors": {
+    "labor": 2.450231958162052,
+    "pesticides": 0.3136595260475933,
+    "fertilizer": -0.5515515515515516,
+    "water": -0.4065556206557782,
+    "custom": -0.6007490903267708,
+    "otherMaterials": 0.11681201909175513,
+    "fuelLubeRepairs": -0.4459830624856947,
+    "operatingInterest": -0.2468073924371726,
+    "cashOverhead": -0.6617874499509987,
+    "nonCashOverhead": -0.23436298470047098,
+    "total": -0.2662388832601599
+   }
+  },
+  {
+   "commodity": "pears",
+   "region": "sacramento sacramento",
+   "oldId": "pears-pearsv2010",
+   "newId": "pears-23pearssv-4-23-24",
+   "oldYear": 2010,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.03432736975467413,
+    "pesticides": -0.4120205735050268,
+    "fertilizer": 0.3296630905326556,
+    "water": -0.5489658792167552,
+    "custom": -0.16085907403566227,
+    "otherMaterials": 0.5448826657514217,
+    "fuelLubeRepairs": -0.4394736842105263,
+    "operatingInterest": -0.6001971566779639,
+    "cashOverhead": 0.32175455519986157,
+    "nonCashOverhead": -0.35573935728684924,
+    "total": -0.2042051608792609
+   }
+  },
+  {
+   "commodity": "pistachios",
+   "region": "joaquin",
+   "oldId": "pistachios-2015pistachios-san-joaquin-valley-south-oct29",
+   "newId": "pistachios-2020pistachiosjvsouth",
+   "oldYear": 2015,
+   "newYear": 2020,
+   "errors": {
+    "labor": -0.062025220297781895,
+    "pesticides": -0.23367081589820093,
+    "fertilizer": 0.21450955444028186,
+    "water": -0.33063214567572885,
+    "custom": -0.046399854767224136,
+    "otherMaterials": -0.13704750069360652,
+    "fuelLubeRepairs": 0.13067798757428703,
+    "operatingInterest": -0.09661091948494185,
+    "cashOverhead": 0.5325319748927798,
+    "nonCashOverhead": -0.24918290003531485,
+    "total": -0.1232282808070702
+   }
+  },
+  {
+   "commodity": "potatoes",
+   "region": "basin intermountain klamath",
+   "oldId": "potatoes-15potatochipperklamathfinaldraftdec10",
+   "newId": "potatoes-23potatofreshmktklamath-final",
+   "oldYear": 2015,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.05390540120994449,
+    "pesticides": 0.2952197297645102,
+    "fertilizer": 0.2516893293974177,
+    "water": 0.27957097834273764,
+    "custom": 0.08469006073263906,
+    "otherMaterials": -0.07938750747714758,
+    "fuelLubeRepairs": -0.1481694691178828,
+    "operatingInterest": -0.012595375907137187,
+    "cashOverhead": 262.49060277715586,
+    "nonCashOverhead": 965.9187512119448,
+    "total": -0.009374735204172082
+   }
+  },
+  {
+   "commodity": "potatoes",
+   "region": "basin intermountain klamath",
+   "oldId": "potatoes-15potatofreshmktklamathfinaldraftdec10",
+   "newId": "potatoes-23potatofreshmktklamath-final",
+   "oldYear": 2015,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.05390540120994449,
+    "pesticides": 0.4285511725343864,
+    "fertilizer": 0.2516893293974177,
+    "water": 0.27957097834273764,
+    "custom": 0.08469006073263906,
+    "otherMaterials": -0.1595635781927577,
+    "fuelLubeRepairs": -0.1481694691178828,
+    "operatingInterest": -0.012668995787799247,
+    "cashOverhead": 262.49060277715586,
+    "nonCashOverhead": 965.9187512119448,
+    "total": -0.009117963492198048
+   }
+  },
+  {
+   "commodity": "prunes",
+   "region": "sacramento",
+   "oldId": "prunes-prunesv2012",
+   "newId": "prunes-2022prunessacvalley42023",
+   "oldYear": 2012,
+   "newYear": 2022,
+   "errors": {
+    "labor": 1.1145542753183753,
+    "pesticides": -0.12224505352467442,
+    "fertilizer": -0.3759898059595929,
+    "water": -0.705783495193596,
+    "pollination": -0.35144448723110044,
+    "custom": -0.17198118095806256,
+    "otherMaterials": -0.13239593656080995,
+    "fuelLubeRepairs": -0.26700389451011597,
+    "operatingInterest": -0.09964709563895384,
+    "cashOverhead": 0.16948363547484302,
+    "nonCashOverhead": -0.43352097158743685,
+    "total": -0.2359258421885598
+   }
+  },
+  {
+   "commodity": "raspberries",
+   "region": "benito cruz monterey santa",
+   "oldId": "raspberries-raspberrycc2012",
+   "newId": "raspberries-23raspberry-fullfinal-dec2023",
+   "oldYear": 2012,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.20848030344251117,
+    "pesticides": -0.85077150182581,
+    "fertilizer": 0.5201919148534974,
+    "water": 1.1234722029289164,
+    "pollination": -0.7338581505662425,
+    "custom": -0.22521391048821127,
+    "otherMaterials": 0.24714507131075628,
+    "fuelLubeRepairs": 0.14472969766401741,
+    "operatingInterest": -0.13930242603156998,
+    "cashOverhead": -0.3556719721045882,
+    "nonCashOverhead": -0.45601689154988645,
+    "total": -0.18557367269834957
+   }
+  },
+  {
+   "commodity": "rice",
+   "region": "sacramento",
+   "oldId": "rice-ricesv2012",
+   "newId": "rice-2021ricesacramentovalley",
+   "oldYear": 2012,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.07628833584715941,
+    "pesticides": -0.30749816976842737,
+    "fertilizer": -0.26185879258124084,
+    "water": -0.21026529671573524,
+    "custom": -0.06284815210267249,
+    "otherMaterials": 0.2296615436591983,
+    "fuelLubeRepairs": -0.39629632229534245,
+    "operatingInterest": 0.09209720537056738,
+    "cashOverhead": -0.3131299009250303,
+    "nonCashOverhead": 0.2982316948561674,
+    "total": -0.17710680486705724
+   }
+  },
+  {
+   "commodity": "rice",
+   "region": "sacramento",
+   "oldId": "rice-2015-rice-2016-amendedfinaldraft7516-1",
+   "newId": "rice-2021ricesacramentovalley",
+   "oldYear": 2015,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.09109342495851153,
+    "pesticides": -0.26442194131407115,
+    "fertilizer": -0.10495955815355273,
+    "water": 0.13907858804916315,
+    "custom": -0.07101812930212696,
+    "otherMaterials": 0.10280682737005274,
+    "fuelLubeRepairs": -0.10914552462932936,
+    "operatingInterest": 0.14901704251124284,
+    "cashOverhead": 0.04144328050209203,
+    "nonCashOverhead": -0.466344135904743,
+    "total": -0.07480847228481298
+   }
+  },
+  {
+   "commodity": "strawberries",
+   "region": "cruz monterey santa",
+   "oldId": "strawberries-strawberrycc2010",
+   "newId": "strawberries-strawberrycentralcoastfinaldraft-121321",
+   "oldYear": 2010,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.4657840138272642,
+    "pesticides": -0.26163804461952267,
+    "fertilizer": -0.16547170389435317,
+    "water": 0.8370716869476068,
+    "custom": -0.45914345187975175,
+    "otherMaterials": -0.21553138714646355,
+    "fuelLubeRepairs": -0.3668049792531121,
+    "operatingInterest": -0.6030206040449783,
+    "cashOverhead": 0.19284067742229985,
+    "nonCashOverhead": 0.38420863436648456,
+    "total": -0.35241023710164937
+   }
+  },
+  {
+   "commodity": "strawberries",
+   "region": "cruz monterey santa",
+   "oldId": "strawberries-strawberry2ndyrcc2011",
+   "newId": "strawberries-strawberrycentralcoastfinaldraft-121321",
+   "oldYear": 2011,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.5331301068306711,
+    "pesticides": -0.27960789852552465,
+    "fertilizer": -0.04504068021509891,
+    "water": -0.13298043646521915,
+    "custom": -0.7624749958243394,
+    "otherMaterials": -0.6357949634726623,
+    "fuelLubeRepairs": -0.4969181653532078,
+    "operatingInterest": -0.7239098101492802,
+    "cashOverhead": 0.08604820065136685,
+    "nonCashOverhead": -0.1301551386952213,
+    "total": -0.5594636712580925
+   }
+  },
+  {
+   "commodity": "strawberries",
+   "region": "benito cruz monterey santa",
+   "oldId": "strawberries-strawberry-cc-organic-2014",
+   "newId": "strawberries-2024strawberry-full-final-march2024",
+   "oldYear": 2014,
+   "newYear": 2024,
+   "errors": {
+    "labor": 2.4237129489387583,
+    "pesticides": -0.16841503730597548,
+    "fertilizer": 1.0801475191963488,
+    "water": -0.04644238967695855,
+    "custom": -0.9373695696045677,
+    "otherMaterials": -0.12505160807716065,
+    "fuelLubeRepairs": 0.6599222015896004,
+    "operatingInterest": -0.6011344963861688,
+    "cashOverhead": 0.16699151279617477,
+    "nonCashOverhead": 1.101401361746273,
+    "total": -0.3896037056098816
+   }
+  },
+  {
+   "commodity": "strawberries",
+   "region": "cruz monterey santa",
+   "oldId": "strawberries-strawberrycentralcoast-2016-final2-5-1-2017",
+   "newId": "strawberries-strawberrycentralcoastfinaldraft-121321",
+   "oldYear": 2016,
+   "newYear": 2021,
+   "errors": {
+    "labor": -0.27651713379697584,
+    "pesticides": -0.21106446712225074,
+    "fertilizer": 0.19385026737967914,
+    "water": -0.15447155825306047,
+    "custom": -0.130063835728884,
+    "otherMaterials": -0.09465876733253194,
+    "fuelLubeRepairs": -0.051471284562570815,
+    "operatingInterest": -0.4702181026673635,
+    "cashOverhead": 0.022401888705865583,
+    "nonCashOverhead": 0.11489035586918578,
+    "total": -0.1821300450775522
+   }
+  },
+  {
+   "commodity": "strawberries",
+   "region": "benito cruz monterey santa",
+   "oldId": "strawberries-2019organicstrawberrycc-final-june-2019",
+   "newId": "strawberries-2024strawberry-full-final-march2024",
+   "oldYear": 2019,
+   "newYear": 2024,
+   "errors": {
+    "labor": -0.6011966272865503,
+    "pesticides": -0.4616271220481007,
+    "fertilizer": 1.9023262169303343,
+    "water": -0.07942331236332724,
+    "custom": -0.4723777346799703,
+    "otherMaterials": -0.03203069686915386,
+    "fuelLubeRepairs": 0.5072259249297933,
+    "operatingInterest": -0.5553308182244567,
+    "cashOverhead": 0.1728769103228602,
+    "nonCashOverhead": 1.0141247687909871,
+    "total": -0.3196265994640354
+   }
+  },
+  {
+   "commodity": "tomatoes",
+   "region": "delta northern sacramento",
+   "oldId": "tomatoes-2017processtomssacvalfinaldraft32817",
+   "newId": "tomatoes-amended-82123-2023processtomatosacramentovalleysdifinal",
+   "oldYear": 2017,
+   "newYear": 2023,
+   "errors": {
+    "labor": 19.54237288135594,
+    "water": 26.461755699496756,
+    "otherMaterials": 33.11930402973634,
+    "fuelLubeRepairs": 36.48246262545381,
+    "cashOverhead": 0.15141373818422932,
+    "nonCashOverhead": -0.029115845238064014,
+    "total": -0.18597560975609756
+   }
+  },
+  {
+   "commodity": "walnuts",
+   "region": "sacramento",
+   "oldId": "walnuts-walnutsv2012",
+   "newId": "walnuts-22walnutssacval-31623",
+   "oldYear": 2012,
+   "newYear": 2022,
+   "errors": {
+    "labor": 0.48612483161203396,
+    "pesticides": -0.09477985128526113,
+    "fertilizer": -0.27205825077060597,
+    "water": -0.7276066846370622,
+    "custom": -0.33061293971175676,
+    "otherMaterials": 0.059307337522535995,
+    "fuelLubeRepairs": 0.3519411488577274,
+    "operatingInterest": -0.5905488177213745,
+    "cashOverhead": -0.08821383869795463,
+    "nonCashOverhead": -0.4506608288734457,
+    "total": -0.3368803879310345
+   }
+  },
+  {
+   "commodity": "walnuts",
+   "region": "joaquin",
+   "oldId": "walnuts-walnutvn2013",
+   "newId": "walnuts-23walnutssacval-final-3-26-24",
+   "oldYear": 2013,
+   "newYear": 2023,
+   "errors": {
+    "labor": 0.039529385552310004,
+    "pesticides": 0.7094509067167658,
+    "fertilizer": 0.7998540102192849,
+    "water": -1,
+    "custom": -0.055242123566959546,
+    "otherMaterials": 0.32235152401643413,
+    "fuelLubeRepairs": 2.5049882433100423,
+    "operatingInterest": 0.13543738283234183,
+    "cashOverhead": -0.28454861573737705,
+    "nonCashOverhead": -0.4202229298338928,
+    "total": -0.2689054726368159
+   }
+  },
+  {
+   "commodity": "walnuts",
+   "region": "sacramento",
+   "oldId": "walnuts-15walnutssacvalleyfinaldraftjan4",
+   "newId": "walnuts-22walnutssacval-31623",
+   "oldYear": 2015,
+   "newYear": 2022,
+   "errors": {
+    "labor": -0.3200609573646377,
+    "pesticides": -0.13628678265908373,
+    "fertilizer": -0.1294905438421862,
+    "water": -0.4387312387179843,
+    "custom": -0.1150747105808175,
+    "otherMaterials": 4.425598025726151,
+    "fuelLubeRepairs": -0.43779110604849025,
+    "operatingInterest": -0.14692128338697924,
+    "cashOverhead": 0.13309295119685374,
+    "nonCashOverhead": -0.2351533065029113,
+    "total": -0.15436422413793102
+   }
+  },
+  {
+   "commodity": "walnuts",
+   "region": "joaquin",
+   "oldId": "walnuts-2017-walnutssjvn-final-draft",
+   "newId": "walnuts-23walnutssacval-final-3-26-24",
+   "oldYear": 2017,
+   "newYear": 2023,
+   "errors": {
+    "labor": 0.5180113990560156,
+    "pesticides": 2.5734489177850017,
+    "fertilizer": -0.07729626346970182,
+    "water": -0.11906666721257099,
+    "custom": -0.05374961746063168,
+    "otherMaterials": 0.2584761896963272,
+    "fuelLubeRepairs": 3.5195633410807856,
+    "operatingInterest": 0.5868665276401981,
+    "cashOverhead": -0.16414641132109595,
+    "nonCashOverhead": -0.2168191067088149,
+    "total": -0.04067164179104477
+   }
+  }
+ ],
+ "medians": {
+  "labor": {
+   "medianAbs": 0.2922650392327813,
+   "n": 46
+  },
+  "pesticides": {
+   "medianAbs": 0.27960789852552465,
+   "n": 45
+  },
+  "fertilizer": {
+   "medianAbs": 0.3296630905326556,
+   "n": 45
+  },
+  "water": {
+   "medianAbs": 0.3609352139960952,
+   "n": 46
+  },
+  "pollination": {
+   "medianAbs": 0.15234539190545374,
+   "n": 12
+  },
+  "custom": {
+   "medianAbs": 0.27969341151535637,
+   "n": 44
+  },
+  "otherMaterials": {
+   "medianAbs": 0.2296615436591983,
+   "n": 36
+  },
+  "fuelLubeRepairs": {
+   "medianAbs": 0.3668049792531121,
+   "n": 45
+  },
+  "operatingInterest": {
+   "medianAbs": 0.2468073924371726,
+   "n": 45
+  },
+  "cashOverhead": {
+   "medianAbs": 0.17350248867927628,
+   "n": 46
+  },
+  "nonCashOverhead": {
+   "medianAbs": 0.38420863436648456,
+   "n": 46
+  },
+  "total": {
+   "medianAbs": 0.18557367269834957,
+   "n": 46
+  }
+ }
+}
