@@ -1,5 +1,5 @@
 import type { RepricedTable } from './types';
-import { periodText, repricingSentence, type ExportMeta } from './exportShared';
+import { fallbackSentence, periodText, repricingSentence, type ExportMeta } from './exportShared';
 
 /** One sheet with the study table (original, factor, and adjusted cost per column) and a Sources sheet. */
 export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Promise<Uint8Array> {
@@ -44,11 +44,12 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
       if (!data) return;
       const target = row.getCell((isProd ? 3 : 2) + i * 3 + 2);
       if (data.overridden) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
-      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.note ?? ''].filter(Boolean).join('\n');
+      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.fallback && !data.overridden ? 'CPI fallback: no specific index matched this label' : '', data.note ?? ''].filter(Boolean).join('\n');
     });
   }
   ws.addRow([]);
   ws.addRow([repricingSentence(table, meta)]);
+  ws.addRow([fallbackSentence(table)]);
   ws.getColumn(1).width = 44; for (let c = 2; c <= header.length; c++) ws.getColumn(c).width = 13;
 
   const src = book.addWorksheet('Sources');
@@ -60,6 +61,7 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   for (const m of meta.mappingNotes) src.addRow([m.label, m.series, m.note]);
   src.addRow([]);
   src.addRow(['Calculation notes and study discrepancies']).font = { bold: true };
+  src.addRow([fallbackSentence(table)]);
   for (const note of table.notes ?? []) src.addRow([note]);
   [44, 40, 18, 18, 60].forEach((w, i) => { src.getColumn(i + 1).width = w; });
   return new Uint8Array(await book.xlsx.writeBuffer());

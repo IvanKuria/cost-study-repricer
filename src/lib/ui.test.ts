@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { repriceStudy } from './reprice';
 import { SERIES } from './series';
 import { studyPicks } from './studies';
-import { hasOverrides, peakCash, repricingSentence } from './exportShared';
+import { fallbackSentence, hasOverrides, peakCash, repricingSentence } from './exportShared';
 import { buildPdf } from './exportPdf';
 import { buildWorkbook } from './exportXlsx';
 import type { ParsedStudy } from '@/data/studySchema';
@@ -48,7 +48,7 @@ describe('the lender screen over the real engine', () => {
         { id: 't', label: 'Total cultural costs', kind: 'subtotal', section: 'Cultural', timeHrs: null, cells: { y1: cell(3000), y2: cell(0), y3: cell(0) }, page: null, quote: null },
         { id: 'a', label: 'Accumulated net cash costs/acre', kind: 'total', section: 'Totals', timeHrs: null, cells: { y1: cell(10653), y2: cell(12416), y3: cell(14894) }, page: null, quote: null },
       ],
-      summary: { totalPerAcreOriginal: 14894, totalPerAcreRepriced: 14894 * 1.2, cashPerAcreRepriced: 14894 * 1.2, coverage: [{ category: 'labor', share: 1, seriesId: 'nass.labor' }], cpiShare: 0 },
+      summary: { totalPerAcreOriginal: 14894, totalPerAcreRepriced: 14894 * 1.2, cashPerAcreRepriced: 14894 * 1.2, coverage: [{ category: 'labor', share: 1, seriesId: 'nass.labor' }], cpiShare: 0, pricedRows: 1, fallbackRows: 0 },
     };
     expect(peakCash(table)).toEqual({ value: 14894 * 1.2, column: '3rd' });
     const meta = { study: null, series: SERIES, interestRate: null, interestSource: 'Kansas City Fed operating loan rate', acres: 1, mappingNotes: [] };
@@ -67,4 +67,20 @@ it('PDF sources appendix is optional and both versions retain a clickable link',
   expect(full).toContain(meta.sourcesUrl);
   expect(full.length).toBeGreaterThan(compact.length);
   expect(compact).not.toContain('How each line was repriced');
+});
+
+it('states how many priced rows use the CPI fallback, and the workbook and detailed PDF carry it', async () => {
+  const table = repriceStudy(study, { targetPeriod: target });
+  const { pricedRows, fallbackRows } = table.summary;
+  expect(pricedRows).toBeGreaterThan(0);
+  const sentence = fallbackSentence(table);
+  expect(sentence).toMatch(fallbackRows ? new RegExp(`^${fallbackRows} of ${pricedRows} priced rows use the CPI fallback`) : /^None of the/);
+  expect(sentence).not.toMatch(/\u2014/);
+  const meta = { study: null, series: SERIES, interestRate: null, interestSource: '', acres: 1, mappingNotes: [] };
+  const { default: ExcelJS } = await import('exceljs');
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load((await buildWorkbook(table, meta)).buffer as ArrayBuffer);
+  const texts: string[] = [];
+  book.getWorksheet('Sources')!.eachRow(r => texts.push(String(r.getCell(1).value)));
+  expect(texts).toContain(sentence);
 });

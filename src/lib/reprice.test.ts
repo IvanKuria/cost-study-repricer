@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import type { ParsedStudy } from '../data/studySchema';
-import { repriceStudy, referencePeriod, DEFAULT_SETTINGS } from './reprice';
+import { repriceStudy, referencePeriod, DEFAULT_SETTINGS, fallbackCount, usesFallback } from './reprice';
 import { SERIES, latestPeriod, lookup, seriesById } from './series';
 
 const load = (id: string) => JSON.parse(readFileSync(`data/studies/parsed/${id}.json`, 'utf8')) as ParsedStudy;
@@ -104,4 +104,61 @@ it('keeps the separate fuel and repair sources behind combined adjustment factor
     expect(part.seriesId).toBeTruthy();
     expect(part.repriced).toBeCloseTo(part.original! * part.indexTo! / part.indexFrom!, 8);
   }
+});
+
+describe('gross returns', () => {
+  const study = load(ALMOND);
+  study.establishment = null;
+  const row = (t: ReturnType<typeof repriceStudy>, id: string) => t.rows.find(r => r.id === id)!.cells.total;
+
+  it('are not indexed, and a lender override replaces them and moves the net returns', () => {
+    const base = repriceStudy(study);
+    const printed = study.costsPerAcre.grossReturns!.value;
+    expect(row(base, 'gross').repriced).toBe(printed);
+    expect(row(base, 'gross').note).toMatch(/not indexed/);
+    const t = repriceStudy(study, { overrides: { 'gross:total': printed + 500 } });
+    expect(row(t, 'gross').overridden).toBe(true);
+    expect(row(t, 'gross').repriced).toBe(printed + 500);
+    expect(row(t, 'net-total').repriced).toBeCloseTo((row(base, 'net-total').repriced ?? 0) + 500, 6);
+    expect(row(t, 'net-operating').repriced).toBeCloseTo((row(base, 'net-operating').repriced ?? 0) + 500, 6);
+  });
+
+  it('keep a row when the study prints none, and a lender value computes the net returns', () => {
+    const none = { ...study, costsPerAcre: { ...study.costsPerAcre, grossReturns: null } } as ParsedStudy;
+    const empty = repriceStudy(none);
+    expect(row(empty, 'gross').original).toBeNull();
+    expect(row(empty, 'gross').repriced).toBeNull();
+    expect(row(empty, 'gross').note).toMatch(/prints no per-acre gross returns/);
+    expect(row(empty, 'net-total').repriced).toBeNull();
+    const t = repriceStudy(none, { overrides: { 'gross:total': 12000 } });
+    const op = row(t, 'total-operating').repriced!, total = row(t, 'total').repriced!;
+    expect(row(t, 'gross').repriced).toBe(12000);
+    expect(row(t, 'net-operating').repriced).toBeCloseTo(12000 - op, 6);
+    expect(row(t, 'net-total').repriced).toBeCloseTo(12000 - total, 6);
+    expect(row(t, 'net-total').original).toBeNull();
+  });
+});
+
+describe('CPI fallback rows', () => {
+  it('counts priced rows whose label matched no specific index', () => {
+    const study = load(ALMOND);
+    study.establishment = null;
+    const t = repriceStudy(study);
+    const flagged = t.rows.filter(usesFallback);
+    expect(t.summary.pricedRows).toBe(t.rows.filter(r => (r.kind === 'operation' || r.kind === 'overheadItem') && Object.values(r.cells).some(c => !!c.original && c.seriesId)).length);
+    expect(t.summary.fallbackRows).toBe(flagged.length);
+    for (const r of flagged) expect(Object.values(r.cells).some(c => c.fallback && c.seriesId === 'bls.cpi' && c.category === 'otherMaterials')).toBe(true);
+    expect(fallbackCount(t.rows)).toEqual({ pricedRows: t.summary.pricedRows, fallbackRows: t.summary.fallbackRows });
+  });
+  it('a row with an unmatched materials label is flagged; overriding it clears the flag', () => {
+    const study = load(ALMOND);
+    study.establishment = null;
+    const op = { ...study.costsPerAcre.operations[0], name: 'Zzz unmatched item', materials: 100, totalCost: (study.costsPerAcre.operations[0].totalCost ?? 0) + 100 };
+    const edited = { ...study, costsPerAcre: { ...study.costsPerAcre, operations: [op, ...study.costsPerAcre.operations.slice(1)] } } as ParsedStudy;
+    const t = repriceStudy(edited);
+    expect(usesFallback(t.rows.find(r => r.id === 'op-0')!)).toBe(true);
+    const o = repriceStudy(edited, { factorOverrides: { 'op-0:materials': 1 } });
+    expect(usesFallback(o.rows.find(r => r.id === 'op-0')!)).toBe(false);
+    expect(o.summary.fallbackRows).toBe(t.summary.fallbackRows - 1);
+  });
 });

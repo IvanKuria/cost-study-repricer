@@ -1,5 +1,5 @@
 import type { RepricedTable } from './types';
-import { fmt, fmtHrs, periodText, repricingSentence, type ExportMeta } from './exportShared';
+import { fallbackSentence, fmt, fmtHrs, periodText, repricingSentence, type ExportMeta } from './exportShared';
 
 /**
  * The study's table on a landscape letter page, laid out the way UC prints it: a title block,
@@ -71,6 +71,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   };
   if (options.includeDetails) {
   para(repricingSentence(table, meta) + ' * marks an edited value.');
+  para(fallbackSentence(table));
   if (meta.study) para(`Source study: UC Davis, ${meta.study.title}, ${meta.study.region}, ${meta.study.year}. ${meta.study.url}`);
   for (const s of meta.series) para(`${s.name}: ${s.source} (${s.unit}), latest ${periodText(s.lastPeriod)}. ${s.url}`);
   if (meta.mappingNotes.length) para('How each line was repriced: ' + meta.mappingNotes.map(m => `${m.label} by ${m.series} (${m.note})`).join('; ') + '.');
@@ -156,6 +157,7 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
   paragraph('Calculation notes and sources', true);
   paragraph('Repriced worksheet. * marks a lender edit.');
   paragraph(repricingSentence(table, meta));
+  paragraph(fallbackSentence(table));
   for (const note of table.notes ?? []) paragraph(note);
   if (meta.study) paragraph(`Source study: UC Davis, ${meta.study.title}. ${meta.study.url}`);
   for (const s of meta.series) paragraph(`${s.name}: ${s.source} (${s.unit}). ${s.url}`);

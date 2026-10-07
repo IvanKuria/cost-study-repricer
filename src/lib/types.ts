@@ -47,6 +47,7 @@ export interface RepricedCell {
   factor: number | null;          // indexTo / indexFrom
   repriced: number | null;        // original x factor, or the override
   overridden: boolean;
+  fallback?: boolean;             // no specific index matched the row's label, so the CPI fallback priced it
 }
 
 /** One row of the study's table, in the study's own column layout. */
@@ -79,6 +80,8 @@ export interface RepricedTable {
     cashPerAcreRepriced: number | null;  // operating + cash overhead
     coverage: { category: Category; share: number; seriesId: string }[]; // share of original cost per category and what repriced it
     cpiShare: number;              // share of cost that fell to the CPI fallback
+    pricedRows: number;            // rows with at least one indexed amount
+    fallbackRows: number;          // of those, rows with an amount priced by the CPI fallback because no specific index matched
   };
 }
 

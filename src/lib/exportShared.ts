@@ -36,6 +36,14 @@ export function repricingSentence(table: RepricedTable, meta: ExportMeta): strin
   return `Repriced from the ${yr} study (prices as of ${periodText(table.referencePeriod)}) to ${periodText(table.targetPeriod)}. ${indexed[0].toUpperCase()}${indexed.slice(1)}; ${cpi}; ${rate}.${edits}`;
 }
 
+/** How many priced rows fell to the CPI because no specific index matched their label. */
+export function fallbackSentence(table: RepricedTable): string {
+  const { fallbackRows: n, pricedRows: m } = table.summary;
+  if (!m) return 'No row was priced by an index.';
+  if (!n) return `None of the ${m} priced rows use the CPI fallback; each matched a specific index.`;
+  return `${n} of ${m} priced rows use the CPI fallback because no specific index matched${n === 1 ? ' its label' : ' their labels'}.`;
+}
+
 export function hasOverrides(table: RepricedTable): boolean {
   return table.rows.some(r => Object.values(r.cells).some(c => c.overridden));
 }

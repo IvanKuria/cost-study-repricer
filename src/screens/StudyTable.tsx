@@ -1,6 +1,7 @@
 import { Fragment, useState } from 'react';
 import type { RepricedCell, RepricedRow, RepricedTable, Series, StudyPick } from '@/lib/types';
-import { fmt, fmtHrs } from '@/lib/exportShared';
+import { fallbackSentence, fmt, fmtHrs } from '@/lib/exportShared';
+import { usesFallback } from '@/lib/reprice';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FactorSource } from './FactorSource';
 import { cn } from '@/lib/utils';
@@ -47,10 +48,10 @@ function YourCost({ row, col, overrideKey, inline = false, onOverride }: { row: 
     <input
       id={`edit-${row.id}-${overrideKey}-${inline ? 'inline' : 'column'}`}
       aria-label={`Your ${row.kind === 'returns' ? 'income' : 'cost'} for ${row.label}, ${col}`}
-      className={cn('w-[88px] px-1.5 text-right tnum text-[13px] rounded border focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 placeholder:text-ink-3', inline ? 'h-11 md:h-[22px] bg-transparent text-[16px] md:text-[13px]' : 'h-11 md:h-7 text-[16px] md:text-[13px] bg-ground', cell.overridden ? 'border-accent bg-accent-soft/40' : inline ? 'border-transparent hover:border-line-strong' : 'border-line', (cell.repriced ?? 0) < 0 && 'text-loss')}
-      placeholder="—"
+      className={cn('w-[88px] px-1.5 text-right tnum text-[13px] rounded border focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 placeholder:text-ink-3', inline ? 'h-11 md:h-[22px] bg-transparent text-[16px] md:text-[13px]' : 'h-11 md:h-7 text-[16px] md:text-[13px] bg-ground', cell.overridden ? 'border-accent bg-accent-soft/40' : inline && row.kind !== 'returns' ? 'border-transparent hover:border-line-strong' : 'border-line', (cell.repriced ?? 0) < 0 && 'text-loss')}
+      placeholder={row.kind === 'returns' && cell.original == null ? 'Enter' : '—'}
       title={[
-        cell.original == null ? 'No amount listed for this year in the study. Enter your cost if applicable.' : `Study: ${fmt(cell.original)}`,
+        cell.original == null ? (row.kind === 'returns' ? 'The study prints no amount here. Enter your income.' : 'No amount listed for this year in the study. Enter your cost if applicable.') : `Study: ${fmt(cell.original)}`,
         cell.original != null && cell.seriesId ? `${cell.seriesId}; index ${cell.indexFrom?.toFixed(2)} to ${cell.indexTo?.toFixed(2)}; factor ${cell.factor?.toFixed(4)}` : '',
         cell.note,
       ].filter(Boolean).join(' — ')}
@@ -84,7 +85,8 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
           <div className="text-[13px] text-ink-2">{[study?.region, study?.year].filter(Boolean).join(' - ')}</div>
         </div>
         {!isProd && <p className="mb-2 text-[12px] text-ink-2">Years after planting · USD per acre · — No amount listed in the study{view !== 'study' && ' · Click a cell to edit'}</p>}
-        {view !== 'study' && <p className="mb-3 text-[12px] text-ink-2">Adjustment factor × study cost = adjusted cost. A factor of 1.10 means a 10% increase.</p>}
+        {view !== 'study' && <p className="mb-1 text-[12px] text-ink-2">Adjustment factor × study cost = adjusted cost. A factor of 1.10 means a 10% increase.</p>}
+        <p className="mb-3 text-[12px] text-ink-2">{fallbackSentence(table)}{table.summary.fallbackRows > 0 && ' Those rows are tagged CPI fallback.'} Returns are not indexed; type a value in a returns row to update it.</p>
         <div className="overflow-x-auto -mx-1 px-1" role="region" aria-label="Cost table" tabIndex={0}>
         <table className="w-full min-w-[1100px] text-[13px] border-collapse">
           <thead>
@@ -103,7 +105,11 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
               const editable = r.kind === 'operation' || r.kind === 'overheadItem' || r.kind === 'returns' || r.kind === 'interest';
               return (
                 <tr key={r.id} className={cn('align-top', (r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net') && 'border-t border-line-strong', (r.kind === 'total' || r.kind === 'net') && 'font-bold')}>
-                  <td className={cn('py-[3px] pr-2 md:sticky md:left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>{view === 'study' ? r.label : r.displayLabel ?? r.label}</td>
+                  <td className={cn('py-[3px] pr-2 md:sticky md:left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>
+                    {view === 'study' ? r.label : r.displayLabel ?? r.label}
+                    {usesFallback(r) && <span className="ml-2 whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title="No specific index matched this label, so the consumer price index (CPI) reprices it.">CPI fallback</span>}
+                    {r.kind === 'returns' && <span className="block text-[11px] leading-snug text-ink-2 normal-case">{returnsHint(r, isProd, view, !!table.yieldRow)}</span>}
+                  </td>
                   {(showTime || hasTime) && <td className="py-[3px] px-2 text-right tnum">{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
                   {cols.map(c => {
                     const cell = r.cells[c.key];
@@ -122,6 +128,13 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
       </div>
     </div>
   );
+}
+
+function returnsHint(row: RepricedRow, isProd: boolean, view: View, hasPrice: boolean): string {
+  const missing = Object.values(row.cells).every(c => c.original == null);
+  if (view === 'study') return isProd && missing ? 'The study prints no per-acre gross returns.' : 'Not indexed.';
+  if (isProd) return missing ? 'The study prints no per-acre gross returns. Type one in to compute net returns.' : 'Not indexed. Type a value to update.';
+  return hasPrice ? 'Not indexed. Type a value in any year, or change the sale price per unit above.' : 'Not indexed. Type a value in any year to update.';
 }
 
 function FactorInput({ cell, label, source, onChange }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void }) {

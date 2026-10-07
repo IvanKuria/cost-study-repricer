@@ -47,7 +47,9 @@ export function factorFor(cls: CellClass, from: string, to: string, mapping: Cat
 
 function cellFrom(original: number | null, cls: CellClass | null, f: Factor | null): RepricedCell {
   const repriced = original == null ? null : f?.factor == null ? original : original * f.factor;
-  return { original, category: cls?.category ?? null, seriesId: f?.seriesId ?? null, indexFrom: f?.indexFrom ?? null, indexTo: f?.indexTo ?? null, factor: f?.factor ?? null, note: f?.note, repriced, overridden: false };
+  const cell: RepricedCell = { original, category: cls?.category ?? null, seriesId: f?.seriesId ?? null, indexFrom: f?.indexFrom ?? null, indexTo: f?.indexTo ?? null, factor: f?.factor ?? null, note: f?.note, repriced, overridden: false };
+  if (cls?.confidence === 'fallback' && f) cell.fallback = true;
+  return cell;
 }
 const plainCell = (original: number | null, repriced: number | null, category: Category | null = null): RepricedCell => ({ original, category, seriesId: null, indexFrom: null, indexTo: null, factor: original && repriced != null ? repriced / original : null, repriced, overridden: false });
 const sumCells = (rows: RepricedRow[], col: string): RepricedCell => plainCell(
@@ -170,7 +172,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const itemsOrig = ohRows.reduce((s, r) => s + (r.cells.total.original ?? 0), 0);
   // If the printed total exceeds the parsed items, the remainder is carried as an unparsed line so totals still match the study.
   if (cashOhOrig - itemsOrig > 1) {
-    const cls: CellClass = { category: 'cashOverhead', confidence: 'fallback' };
+    const cls: CellClass = { category: 'cashOverhead', confidence: 'column' };
     const row: RepricedRow = { id: 'oh-rest', label: 'Other cash overhead (not itemized in the parsed table)', kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(cashOhOrig - itemsOrig, cls, F(cls)) }, page: null, quote: null };
     applyOverride(row, 'total', settings); ohRows.push(row); rows.push(row);
   }
@@ -192,16 +194,20 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const totalRep = (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0) + (totalNc.cells.total.repriced ?? 0);
   rows.push({ id: 'total', label: 'TOTAL COSTS/ACRE', kind: 'total', section: 'Total', timeHrs: null, cells: { total: plainCell(totalOrig, totalRep) }, page: study.costsPerAcre.totalCost?.page ?? null, quote: study.costsPerAcre.totalCost?.quote ?? null });
 
-  // Returns are the study's; the lender changes them by override.
+  // Returns are the study's and are never indexed; the lender changes them by override. A study that prints no
+  // per-acre gross returns still gets the row, empty, so a lender can type one in and see net returns.
   const gross = study.costsPerAcre.grossReturns;
-  if (gross) {
-    const gr: RepricedRow = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'returns', section: 'Returns', timeHrs: null, cells: { total: plainCell(gross.value, gross.value) }, page: gross.page, quote: gross.quote };
-    applyOverride(gr, 'total', settings);
-    rows.push(gr);
-    const g = gr.cells.total.repriced ?? gross.value;
-    rows.push({ id: 'net-operating', label: 'NET RETURNS ABOVE OPERATING COSTS', kind: 'net', section: 'Returns', timeHrs: null, cells: { total: plainCell(gross.value - (totalOperating.cells.total.original ?? 0), g - (totalOperating.cells.total.repriced ?? 0)) }, page: null, quote: null });
-    rows.push({ id: 'net-total', label: 'NET RETURNS ABOVE TOTAL COSTS', kind: 'net', section: 'Returns', timeHrs: null, cells: { total: plainCell(gross.value - totalOrig, g - totalRep) }, page: null, quote: null });
-  }
+  const grossOrig = gross?.value ?? null;
+  const grossNote = grossOrig == null
+    ? 'The study prints no per-acre gross returns. Type a value to compute net returns.'
+    : 'Returns are not indexed. Type a value to update.';
+  const gr: RepricedRow = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'returns', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig), note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
+  applyOverride(gr, 'total', settings);
+  rows.push(gr);
+  const g = gr.cells.total.repriced;
+  const net = (cost: number | null | undefined, costRep: number | null | undefined) => plainCell(grossOrig == null ? null : grossOrig - (cost ?? 0), g == null ? null : g - (costRep ?? 0));
+  rows.push({ id: 'net-operating', label: 'NET RETURNS ABOVE OPERATING COSTS', kind: 'net', section: 'Returns', timeHrs: null, cells: { total: net(totalOperating.cells.total.original, totalOperating.cells.total.repriced) }, page: null, quote: null });
+  rows.push({ id: 'net-total', label: 'NET RETURNS ABOVE TOTAL COSTS', kind: 'net', section: 'Returns', timeHrs: null, cells: { total: net(totalOrig, totalRep) }, page: null, quote: null });
 
   return {
     studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production',
@@ -266,7 +272,7 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
         if (!incomeCells[c.key]) {
           const yieldValue = est.yieldRow?.values[k];
           const rep = settings.pricePerUnit != null && yieldValue != null ? yieldValue * settings.pricePerUnit : original;
-          incomeCells[c.key] = plainCell(original, rep);
+          incomeCells[c.key] = { ...plainCell(original, rep), note: est.yieldRow ? 'Returns are not indexed. Change the sale price per unit or type a value to update.' : 'Returns are not indexed. Type a value to update.' };
           const v = settings.overrides[`income:${c.key}`];
           if (v != null) incomeCells[c.key] = { ...incomeCells[c.key], repriced: v, overridden: true };
         }
@@ -335,5 +341,15 @@ function summarize(rows: RepricedRow[], totalOrig: number | null, totalRep: numb
   }
   const coverage = [...byCat.values()].map(v => ({ category: v.category, share: all ? v.orig / all : 0, seriesId: v.series })).sort((a, b) => b.share - a.share);
   const cpiShare = coverage.filter(c => c.seriesId === 'bls.cpi').reduce((s, c) => s + c.share, 0);
-  return { totalPerAcreOriginal: round(totalOrig), totalPerAcreRepriced: round(totalRep), cashPerAcreRepriced: round(cashRep), coverage, cpiShare };
+  const { pricedRows, fallbackRows } = fallbackCount(rows);
+  return { totalPerAcreOriginal: round(totalOrig), totalPerAcreRepriced: round(totalRep), cashPerAcreRepriced: round(cashRep), coverage, cpiShare, pricedRows, fallbackRows };
+}
+
+/** True when an amount on this row was priced by the CPI fallback because no specific index matched its label. */
+export const usesFallback = (row: RepricedRow) => Object.values(row.cells).some(c => c.fallback && !!c.original && !c.overridden);
+
+/** Rows with an indexed amount, and how many of them fell to the CPI fallback. */
+export function fallbackCount(rows: RepricedRow[]): { pricedRows: number; fallbackRows: number } {
+  const priced = rows.filter(r => (r.kind === 'operation' || r.kind === 'overheadItem') && Object.values(r.cells).some(c => !!c.original && c.seriesId));
+  return { pricedRows: priced.length, fallbackRows: priced.filter(usesFallback).length };
 }
