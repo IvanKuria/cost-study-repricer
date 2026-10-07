@@ -7,6 +7,7 @@ export const CATEGORY_LABEL: Record<string, string> = {
   labor: 'Labor', pesticides: 'Pesticides and pest control materials', fertilizer: 'Fertilizer', water: 'Water and irrigation', pollination: 'Pollination',
   custom: 'Custom and contracted services', otherMaterials: 'Other materials and assessments', fuelLubeRepairs: 'Fuel, lube and repairs',
   operatingInterest: 'Operating interest', cashOverhead: 'Cash overhead', nonCashOverhead: 'Non-cash overhead and capital recovery',
+  establishmentCpi: 'Establishment cost (CPI)',
 };
 
 export function mappingNotes(mapping: CategoryMapping[], series: Series[]) {

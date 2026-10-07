@@ -15,6 +15,7 @@ export const DEFAULT_MAPPING: CategoryMapping[] = [
   { category: 'pollination', seriesId: 'bls.cpi', note: 'his: CPI.' },
   { category: 'otherMaterials', seriesId: 'bls.cpi', note: 'his: CPI. ours: seed, plant, tree and vine costs use the USDA seeds and plants index when it has been pulled, else CPI.' },
   { category: 'cashOverhead', seriesId: 'bls.cpi', note: 'his: CPI.' },
+  { category: 'establishmentCpi', seriesId: 'bls.cpi', note: 'his: establishment costs are repriced row by row from the study\'s establishment table. When there is no usable table, the printed establishment cost (the accumulated total, and the yearly charge inside non-cash overhead) is repriced with the CPI, all items.' },
   { category: 'operatingInterest', seriesId: 'kcfed.operatingRate', note: 'his: recomputed at the Kansas City Fed operating loan rate, never indexed.' },
 ];
 

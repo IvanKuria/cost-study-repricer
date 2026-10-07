@@ -40,7 +40,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     if (r.kind === 'heading') { body.push([{ content: r.label, styles: { fontStyle: 'bold' } }, ...Array(head[0].length - 1).fill('')]); continue; }
     if (r.kind === 'blank') { body.push(Array(head[0].length).fill('')); continue; }
     const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || r.kind === 'returns';
-    const label = caps ? r.label.toUpperCase() : `    ${r.label}`;
+    const label = caps ? r.label.toUpperCase() : `    ${r.label}${r.sourceNote ? `\n    ${r.sourceNote}` : ''}`;
     const cells = columns.map(c => fmt(r.cells[c.key]?.repriced) + (r.cells[c.key]?.overridden ? ' *' : ''));
     const hrs = timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs;
     body.push([label, ...(isProd ? [fmtHrs(hrs)] : []), ...cells].map((v, i) => ({ content: v, styles: { fontStyle: caps && i === 0 ? 'bold' : 'normal' } })));
@@ -69,9 +69,11 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     if (y + lines.length * (size + 2) > H - margin) { doc.addPage(); y = margin; }
     doc.text(lines, margin, y); y += lines.length * (size + 2) + 4;
   };
+  if (table.establishmentNote) para(table.establishmentNote, 8, ink);
   if (options.includeDetails) {
   para(repricingSentence(table, meta) + ' * marks an edited value.');
   para(fallbackSentence(table));
+  for (const note of table.notes ?? []) para(note);
   if (meta.study) para(`Source study: UC Davis, ${meta.study.title}, ${meta.study.region}, ${meta.study.year}. ${meta.study.url}`);
   for (const s of meta.series) para(`${s.name}: ${s.source} (${s.unit}), latest ${periodText(s.lastPeriod)}. ${s.url}`);
   if (meta.mappingNotes.length) para('How each line was repriced: ' + meta.mappingNotes.map(m => `${m.label} by ${m.series} (${m.note})`).join('; ') + '.');
@@ -158,6 +160,7 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
   paragraph('Repriced worksheet. * marks a lender edit.');
   paragraph(repricingSentence(table, meta));
   paragraph(fallbackSentence(table));
+  if (table.establishmentNote) paragraph(table.establishmentNote);
   for (const note of table.notes ?? []) paragraph(note);
   if (meta.study) paragraph(`Source study: UC Davis, ${meta.study.title}. ${meta.study.url}`);
   for (const s of meta.series) paragraph(`${s.name}: ${s.source} (${s.unit}). ${s.url}`);

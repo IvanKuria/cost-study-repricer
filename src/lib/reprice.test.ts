@@ -143,6 +143,7 @@ describe('CPI fallback rows', () => {
   it('counts priced rows whose label matched no specific index', () => {
     const study = load(ALMOND);
     study.establishment = null;
+    study.establishmentSummary = undefined; // isolate the fallback count from the establishment tiers
     const t = repriceStudy(study);
     const flagged = t.rows.filter(usesFallback);
     expect(t.summary.pricedRows).toBe(t.rows.filter(r => (r.kind === 'operation' || r.kind === 'overheadItem') && Object.values(r.cells).some(c => !!c.original && c.seriesId)).length);
@@ -160,5 +161,107 @@ describe('CPI fallback rows', () => {
     const o = repriceStudy(edited, { factorOverrides: { 'op-0:materials': 1 } });
     expect(usesFallback(o.rows.find(r => r.id === 'op-0')!)).toBe(false);
     expect(o.summary.fallbackRows).toBe(t.summary.fallbackRows - 1);
+  });
+});
+
+describe('establishment cost tiers', () => {
+  const base = load(ALMOND);
+  base.establishment = null;
+  base.establishmentSummary = undefined; // each test sets the summary it needs
+  const printedNc = base.costsPerAcre.nonCashOverheadTotal!;
+  const withSummary = (s: Partial<NonNullable<ParsedStudy['establishmentSummary']>>): ParsedStudy => ({ ...base, establishmentSummary: { perennial: true, status: 'none', total: null, annualCharge: null, reason: null, ...s } });
+  const cpi = seriesById('bls.cpi')!;
+  const row = (t: ReturnType<typeof repriceStudy>, id: string) => t.rows.find(r => r.id === id);
+  const cpiFactor = (t: ReturnType<typeof repriceStudy>) => lookup(cpi, t.targetPeriod)!.value / lookup(cpi, '2024-06')!.value;
+
+  it('a missing establishmentSummary behaves as status none on an annual crop', () => {
+    const t = repriceStudy(base);
+    expect(t.establishmentNote).toBeNull();
+    expect(t.rows.some(r => r.section === 'Establishment')).toBe(false);
+    expect(row(t, 'nc-0')!.cells.total.original).toBe(printedNc.value);
+    expect(row(t, 'nc-0')!.cells.total.category).toBe('nonCashOverhead');
+    expect(row(t, 'nc-establishment')).toBeUndefined();
+    expect(repriceStudy(withSummary({ perennial: false })).establishmentNote).toBeNull();
+  });
+
+  it('splits the yearly charge out of the printed non-cash total, reprices it by CPI, and the totals still reconcile', () => {
+    const plain = repriceStudy(base);
+    const study = withSummary({ status: 'total', annualCharge: { value: 500, page: 9, quote: 'Establishment cost 500' } });
+    const t = repriceStudy(study);
+    const machinery = row(t, 'nc-0')!.cells.total, charge = row(t, 'nc-establishment')!.cells.total;
+    expect(machinery.original).toBe(printedNc.value - 500);
+    expect(machinery.category).toBe('nonCashOverhead');
+    expect(charge.original).toBe(500);
+    expect(charge.category).toBe('establishmentCpi');
+    expect(charge.seriesId).toBe('bls.cpi');
+    expect(charge.factor).toBeCloseTo(cpiFactor(t), 10);
+    expect(charge.repriced).toBeCloseTo(500 * cpiFactor(t), 8);
+    expect(row(t, 'nc-establishment')!.page).toBe(9);
+    const nc = row(t, 'total-noncash')!.cells.total;
+    expect(nc.original).toBe(printedNc.value);
+    expect(nc.repriced).toBeCloseTo((machinery.repriced ?? 0) + (charge.repriced ?? 0), 8);
+    const total = row(t, 'total')!.cells.total;
+    expect(total.original).toBe(row(plain, 'total')!.cells.total.original);
+    expect(Math.round(total.original!)).toBe(base.costsPerAcre.totalCost!.value);
+    expect(total.repriced).toBeCloseTo((row(t, 'total-operating')!.cells.total.repriced ?? 0) + (row(t, 'total-cash-oh')!.cells.total.repriced ?? 0) + (nc.repriced ?? 0), 8);
+    expect(row(t, 'net-total')!.cells.total.original).toBe(row(plain, 'net-total')!.cells.total.original);
+    expect(row(t, 'net-total')!.cells.total.repriced).toBeCloseTo(base.costsPerAcre.grossReturns!.value - total.repriced!, 8);
+    expect(t.notes!.join(' ')).toMatch(/yearly establishment charge of \$500/);
+  });
+
+  it('gives an itemized non-cash establishment line the CPI category', () => {
+    const items = [{ description: 'Equipment', value: 1000, page: 9, quote: 'Equipment 1000' }, { description: 'Orchard establishment', value: 900, page: 9, quote: 'Establishment 900' }];
+    const study = { ...base, costsPerAcre: { ...base.costsPerAcre, nonCashOverheadItems: items } } as ParsedStudy;
+    const t = repriceStudy(study);
+    expect(row(t, 'nc-0')!.cells.total.category).toBe('nonCashOverhead');
+    expect(row(t, 'nc-1')!.cells.total.category).toBe('establishmentCpi');
+    expect(row(t, 'nc-1')!.cells.total.seriesId).toBe('bls.cpi');
+    expect(row(t, 'total-noncash')!.cells.total.original).toBe(1900);
+  });
+
+  it('tier 2 shows the printed establishment total repriced by CPI, cited, editable, and outside the yearly totals', () => {
+    const plain = repriceStudy(base);
+    const study = withSummary({ status: 'total', total: { value: 12000, page: 7, quote: 'Total establishment cost 12,000', source: 'investment' } });
+    const t = repriceStudy(study);
+    const est = row(t, 'establishment-total')!;
+    expect(est.cells.total.original).toBe(12000);
+    expect(est.cells.total.seriesId).toBe('bls.cpi');
+    expect(est.cells.total.category).toBe('establishmentCpi');
+    expect(est.cells.total.repriced).toBeCloseTo(12000 * cpiFactor(t), 8);
+    expect(est.page).toBe(7);
+    expect(est.sourceNote).toMatch(/investment table, page 7/);
+    expect(est.sourceNote).toMatch(/not added to the yearly total cost/);
+    expect(t.establishmentNote).toMatch(/one-time investment/);
+    expect(t.notes!.join(' ')).toMatch(/CPI/);
+    expect(row(t, 'total')!.cells.total.repriced).toBeCloseTo(row(plain, 'total')!.cells.total.repriced!, 8);
+    expect(t.summary).toEqual(plain.summary);
+    const edited = repriceStudy(study, { overrides: { 'establishment-total:total': 15000 } });
+    expect(row(edited, 'establishment-total')!.cells.total.repriced).toBe(15000);
+    expect(row(edited, 'establishment-total')!.cells.total.overridden).toBe(true);
+    expect(row(edited, 'total')!.cells.total.repriced).toBeCloseTo(row(plain, 'total')!.cells.total.repriced!, 8);
+    const factored = repriceStudy(study, { factorOverrides: { 'establishment-total:total': 1.5 } });
+    expect(row(factored, 'establishment-total')!.cells.total.repriced).toBeCloseTo(18000, 8);
+    for (const [source, words] of [['table', 'establishment table'], ['production', 'production table'], ['prose', 'study text']] as const) {
+      expect(row(repriceStudy(withSummary({ status: 'total', total: { value: 1, page: 2, quote: '', source } })), 'establishment-total')!.sourceNote).toMatch(words);
+    }
+  });
+
+  it('tier 3 flags a perennial study with no establishment cost, and says nothing for annual crops', () => {
+    const t = repriceStudy(withSummary({ perennial: true, reason: 'no establishment section found' }));
+    expect(t.establishmentNote).toBe('This study prints no establishment cost we could find; establishment is not included.');
+    expect(t.notes!.join(' ')).toMatch(/no establishment section found/);
+    expect(t.rows.some(r => r.section === 'Establishment')).toBe(false);
+    expect(repriceStudy(withSummary({ perennial: false })).establishmentNote).toBeNull();
+  });
+
+  it('tier 1 keeps the establishment table behavior and adds the total\'s source line', () => {
+    const study = { ...load('almonds-2024-almondssjvsouth-final-draft-8-3-25'), establishmentSummary: undefined };
+    const plain = repriceStudy(study);
+    expect(plain.layout).toBe('establishment');
+    const t = repriceStudy({ ...study, establishmentSummary: { perennial: true, status: 'table', total: { value: 9000, page: 6, quote: '', source: 'table' }, annualCharge: null, reason: null } });
+    expect(t.rows).toEqual(plain.rows);
+    expect(t.summary).toEqual(plain.summary);
+    expect(t.establishmentNote).toMatch(/establishment table, page 6/);
+    expect(plain.establishmentNote).toBeNull();
   });
 });

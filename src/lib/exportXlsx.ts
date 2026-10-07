@@ -44,10 +44,11 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
       if (!data) return;
       const target = row.getCell((isProd ? 3 : 2) + i * 3 + 2);
       if (data.overridden) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
-      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.fallback && !data.overridden ? 'CPI fallback: no specific index matched this label' : '', data.note ?? ''].filter(Boolean).join('\n');
+      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.fallback && !data.overridden ? 'CPI fallback: no specific index matched this label' : '', data.note ?? '', r.sourceNote ?? ''].filter(Boolean).join('\n');
     });
   }
   ws.addRow([]);
+  if (table.establishmentNote) ws.addRow([table.establishmentNote]);
   ws.addRow([repricingSentence(table, meta)]);
   ws.addRow([fallbackSentence(table)]);
   ws.getColumn(1).width = 44; for (let c = 2; c <= header.length; c++) ws.getColumn(c).width = 13;
@@ -62,6 +63,7 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   src.addRow([]);
   src.addRow(['Calculation notes and study discrepancies']).font = { bold: true };
   src.addRow([fallbackSentence(table)]);
+  if (table.establishmentNote) src.addRow([table.establishmentNote]);
   for (const note of table.notes ?? []) src.addRow([note]);
   [44, 40, 18, 18, 60].forEach((w, i) => { src.getColumn(i + 1).width = w; });
   return new Uint8Array(await book.xlsx.writeBuffer());

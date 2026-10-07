@@ -66,7 +66,7 @@ export function rowCategory(label: string, section: string): CellClass {
 }
 
 export type CategoryTotals = Record<Category, number>;
-export const emptyTotals = (): CategoryTotals => ({ labor: 0, pesticides: 0, fertilizer: 0, water: 0, pollination: 0, custom: 0, otherMaterials: 0, fuelLubeRepairs: 0, operatingInterest: 0, cashOverhead: 0, nonCashOverhead: 0 });
+export const emptyTotals = (): CategoryTotals => ({ labor: 0, pesticides: 0, fertilizer: 0, water: 0, pollination: 0, custom: 0, otherMaterials: 0, fuelLubeRepairs: 0, operatingInterest: 0, cashOverhead: 0, nonCashOverhead: 0, establishmentCpi: 0 });
 
 /** Interest on operating capital is not a parsed row: it is the printed operating total less the operation rows, when that gap is plausible. */
 export function impliedInterest(study: ParsedStudy): { value: number; note: string } | null {

@@ -4,7 +4,7 @@
 /** The professor's eleven cost categories, from Budgets data.xlsx. */
 export type Category =
   | 'labor' | 'pesticides' | 'fertilizer' | 'water' | 'pollination' | 'custom'
-  | 'otherMaterials' | 'fuelLubeRepairs' | 'operatingInterest' | 'cashOverhead' | 'nonCashOverhead';
+  | 'otherMaterials' | 'fuelLubeRepairs' | 'operatingInterest' | 'cashOverhead' | 'nonCashOverhead' | 'establishmentCpi';
 
 /** A monthly price series. Values keyed 'YYYY-MM'. */
 export interface Series {
@@ -61,10 +61,12 @@ export interface RepricedRow {
   cells: Record<string, RepricedCell>; // column key -> cell; production: labor, fuelLubeRepairs, materials, custom, total; establishment: year1..yearN
   page: number | null;
   quote: string | null;
+  sourceNote?: string | null;     // plain-words source line shown under the label, e.g. where an establishment total was printed
 }
 
 export interface RepricedTable {
   notes?: string[];
+  establishmentNote?: string | null; // establishment status in plain words: its source, or that the study prints none
   yieldRow?: { label: string; values: (number | null)[] } | null;
   summaryColumn?: string;
   studyId: string;

@@ -86,6 +86,7 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
         </div>
         {!isProd && <p className="mb-2 text-[12px] text-ink-2">Years after planting · USD per acre · — No amount listed in the study{view !== 'study' && ' · Click a cell to edit'}</p>}
         {view !== 'study' && <p className="mb-1 text-[12px] text-ink-2">Adjustment factor × study cost = adjusted cost. A factor of 1.10 means a 10% increase.</p>}
+        {table.establishmentNote && <p className="mb-2 text-[13px] text-ink">{table.establishmentNote}</p>}
         <p className="mb-3 text-[12px] text-ink-2">{fallbackSentence(table)}{table.summary.fallbackRows > 0 && ' Those rows are tagged CPI fallback.'} Returns are not indexed; type a value in a returns row to update it.</p>
         <div className="overflow-x-auto -mx-1 px-1" role="region" aria-label="Cost table" tabIndex={0}>
         <table className="w-full min-w-[1100px] text-[13px] border-collapse">
@@ -108,6 +109,7 @@ export function StudyTable({ table, study, series, view, onOverride, onFactor }:
                   <td className={cn('py-[3px] pr-2 md:sticky md:left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>
                     {view === 'study' ? r.label : r.displayLabel ?? r.label}
                     {usesFallback(r) && <span className="ml-2 whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title="No specific index matched this label, so the consumer price index (CPI) reprices it.">CPI fallback</span>}
+                    {r.sourceNote && <span className="block text-[11px] leading-snug text-ink-2">{r.sourceNote}</span>}
                     {r.kind === 'returns' && <span className="block text-[11px] leading-snug text-ink-2 normal-case">{returnsHint(r, isProd, view, !!table.yieldRow)}</span>}
                   </td>
                   {(showTime || hasTime) && <td className="py-[3px] px-2 text-right tnum">{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}

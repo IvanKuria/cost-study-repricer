@@ -84,3 +84,24 @@ it('states how many priced rows use the CPI fallback, and the workbook and detai
   book.getWorksheet('Sources')!.eachRow(r => texts.push(String(r.getCell(1).value)));
   expect(texts).toContain(sentence);
 });
+
+describe('establishment in exports', () => {
+  it('carries the tier 2 row and the establishment note into the workbook and PDF', async () => {
+    const withTotal = { ...study, establishmentSummary: { perennial: true, status: 'total', total: { value: 12000, page: 7, quote: 'Total 12,000', source: 'investment' }, annualCharge: null, reason: null } } as ParsedStudy;
+    const table = repriceStudy(withTotal, { targetPeriod: target }, SERIES);
+    const meta = { study: null, series: SERIES, interestRate: null, interestSource: '', acres: 10, mappingNotes: [{ label: 'Establishment cost (CPI)', series: 'CPI', note: 'his rule' }] };
+    const { default: ExcelJS } = await import('exceljs');
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load((await buildWorkbook(table, meta)).buffer as ArrayBuffer);
+    const text = (name: string) => { const out: string[] = []; book.getWorksheet(name)!.eachRow(r => out.push(String(r.getCell(1).value ?? ''))); return out.join('\n'); };
+    expect(text('Table')).toMatch(/Establishment cost per acre, accumulated/);
+    expect(text('Table')).toMatch(/one-time investment/);
+    expect(text('Sources')).toMatch(/Establishment cost \(CPI\)/);
+    const none = repriceStudy({ ...study, establishmentSummary: { perennial: true, status: 'none', total: null, annualCharge: null, reason: null } } as ParsedStudy, { targetPeriod: target }, SERIES);
+    expect((await buildPdf(none, meta)).byteLength).toBeGreaterThan(5000);
+    const b2 = new ExcelJS.Workbook();
+    await b2.xlsx.load((await buildWorkbook(none, meta)).buffer as ArrayBuffer);
+    const rows: string[] = []; b2.getWorksheet('Table')!.eachRow(r => rows.push(String(r.getCell(1).value ?? '')));
+    expect(rows).toContain('This study prints no establishment cost we could find; establishment is not included.');
+  });
+});

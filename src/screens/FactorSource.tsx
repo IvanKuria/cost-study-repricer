@@ -48,6 +48,7 @@ export function FactorSource({ row, column, table, series, study }: { row: Repri
         <p className="text-ink-2">Material categories are assigned from the operation label. For mixed jobs, the first recognized purpose selects the material index.</p>
       </> : <>
         {cell.category && <p>Cost category: {CATEGORY_LABEL[cell.category]}.</p>}
+        {cell.category === 'establishmentCpi' && <p>The professor's rule: establishment costs are repriced row by row from the study's establishment table. An establishment figure outside that table, such as this one, is repriced with the CPI, all items.</p>}
         <SourceDetail cell={cell} table={table} series={series} />
       </>}
       <p>Adjusted cost: {money(cell.original)} × {number(cell.factor)} = {money(cell.repriced)} per acre.</p>

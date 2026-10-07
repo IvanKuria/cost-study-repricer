@@ -27,7 +27,7 @@ export function shown(row: RepricedRow, col: string): number | null {
 export function repricingSentence(table: RepricedTable, meta: ExportMeta): string {
   const yr = meta.study?.year ?? table.referencePeriod.slice(0, 4);
   const withIndex = [...new Set(table.summary.coverage.filter(c => c.seriesId.startsWith('nass.') && c.share > 0).map(c => c.category))];
-  const names: Record<string, string> = { labor: 'labor', fuelLubeRepairs: 'fuel, lube and repairs', fertilizer: 'fertilizer', pesticides: 'pesticides', nonCashOverhead: 'machinery', custom: 'custom work', water: 'water', pollination: 'pollination', otherMaterials: 'other materials', cashOverhead: 'cash overhead', operatingInterest: 'operating interest' };
+  const names: Record<string, string> = { labor: 'labor', fuelLubeRepairs: 'fuel, lube and repairs', fertilizer: 'fertilizer', pesticides: 'pesticides', nonCashOverhead: 'machinery', custom: 'custom work', water: 'water', pollination: 'pollination', otherMaterials: 'other materials', cashOverhead: 'cash overhead', operatingInterest: 'operating interest', establishmentCpi: 'establishment' };
   const list = withIndex.map(c => names[c] ?? c);
   const indexed = list.length ? `${list.join(', ')} use USDA prices-paid indexes` : 'no line matched a USDA prices-paid index';
   const cpi = `${Math.round(table.summary.cpiShare * 100)} percent of cost used the consumer price index because no producer index applies`;
