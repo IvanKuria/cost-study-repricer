@@ -145,6 +145,16 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     opRows.push(row);
     const list = bySection.get(o.category) ?? []; list.push(row); bySection.set(o.category, list);
   });
+  // No readable operation rows (the table is an image in the PDF) but a printed operating total: reprice that one
+  // figure with the CPI fallback, flagged like any other fallback row. It already includes the study's interest.
+  const printedOperating = study.costsPerAcre.operatingTotal;
+  if (!ops.length && printedOperating) {
+    const cls: CellClass = { category: 'otherMaterials', confidence: 'fallback' };
+    const row: RepricedRow = { id: 'op-printed', label: 'Operating costs, printed total (rows not readable in the study)', kind: 'operation', section: 'Operating', timeHrs: null, cells: { total: cellFrom(printedOperating.value, cls, F(cls)) }, page: printedOperating.page, quote: printedOperating.quote };
+    applyOverride(row, 'total', settings);
+    opRows.push(row);
+    rows.push(row);
+  }
   const order: OperationRow['category'][] = ['cultural', 'harvest', 'assessment', 'postharvest', 'other'];
   for (const sec of order) {
     const list = bySection.get(sec); if (!list) continue;

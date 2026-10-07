@@ -265,3 +265,16 @@ describe('establishment cost tiers', () => {
     expect(plain.establishmentNote).toBeNull();
   });
 });
+
+describe('studies whose operation rows cannot be read', () => {
+  it('reprice the printed operating total as one CPI fallback row, so totals still match the study', () => {
+    const study = load('onions-2023onions-final');
+    expect(study.costsPerAcre.operations.length).toBe(0);
+    const t = repriceStudy(study);
+    const row = t.rows.find(r => r.id === 'op-printed')!;
+    expect(row.cells.total.original).toBe(study.costsPerAcre.operatingTotal!.value);
+    expect(row.cells.total.seriesId).toBe('bls.cpi');
+    expect(row.cells.total.fallback).toBe(true);
+    expect(t.rows.find(r => r.id === 'total')!.cells.total.original).toBeCloseTo(study.costsPerAcre.totalCost!.value, 0);
+  });
+});
