@@ -54,7 +54,7 @@ function YourCost({ row, col, overrideKey, inline = false, onOverride }: { row: 
         cell.original == null ? (row.kind === 'returns' ? 'The study prints no amount here. Enter your income.' : 'No amount listed for this year in the study. Enter your cost if applicable.') : `Study: ${fmt(cell.original)}`,
         cell.original != null && cell.seriesId ? `${cell.seriesId}; index ${cell.indexFrom?.toFixed(2)} to ${cell.indexTo?.toFixed(2)}; factor ${cell.factor?.toFixed(4)}` : '',
         cell.note,
-      ].filter(Boolean).join(' — ')}
+      ].filter(Boolean).join('. ')}
       inputMode="decimal"
       value={shown}
       onFocus={() => setText(cell.repriced === null ? '' : String(Math.round(cell.repriced)))}

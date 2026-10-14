@@ -29,6 +29,7 @@ export interface RepriceSettings {
   targetPeriod: string;           // 'YYYY-MM', default the latest month common to the series used
   referenceMonth: number;         // 1..12, default 6 (June of the study's price year)
   interestRate: number | null;    // yearly rate for operating interest; null keeps the study's own
+  capitalRecoveryRate?: number | null; // yearly rate for the establishment capital recovery charge; null keeps the study's own
   overrides: Record<string, number>; // lineId -> lender-typed 'your cost' value (per acre)
   mapping: CategoryMapping[];
 }
@@ -48,6 +49,7 @@ export interface RepricedCell {
   repriced: number | null;        // original x factor, or the override
   overridden: boolean;
   fallback?: boolean;             // no specific index matched the row's label, so the CPI fallback priced it
+  recalculated?: boolean;         // computed from other repriced figures (establishment capital recovery, insurance, taxes), not indexed; `note` shows the working
 }
 
 /** One row of the study's table, in the study's own column layout. */

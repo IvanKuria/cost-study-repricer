@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-09-30",
+ "generatedAt": "2026-10-14",
  "pairs": [
   {
    "commodity": "alfalfa",
@@ -9,16 +9,16 @@
    "oldYear": 2012,
    "newYear": 2020,
    "errors": {
-    "labor": -0.5508659301283965,
-    "pesticides": -0.5719160460392688,
-    "fertilizer": -0.7652458123382815,
-    "water": -0.01334022423688016,
-    "custom": -0.5179462238414472,
-    "fuelLubeRepairs": -0.4354807791556691,
-    "operatingInterest": -0.5153088091371701,
-    "cashOverhead": -0.06872048261842292,
-    "nonCashOverhead": -0.12113079262837718,
-    "total": -0.3232758620689655
+    "labor": -1,
+    "pesticides": -0.48111035883547737,
+    "fertilizer": -0.7192155794634345,
+    "water": -0.7434684583015888,
+    "custom": -1,
+    "fuelLubeRepairs": -0.31095448044000773,
+    "operatingInterest": -0.7463805368836335,
+    "cashOverhead": 0.02803583087576693,
+    "nonCashOverhead": -0.41885847199856857,
+    "total": -0.4939655172413793
    }
   },
   {
@@ -29,16 +29,16 @@
    "oldYear": 2012,
    "newYear": 2020,
    "errors": {
-    "labor": -0.3564646163033741,
-    "pesticides": -0.403276912660799,
-    "fertilizer": -0.3785918561895684,
-    "water": -0.01334022423688016,
-    "custom": -0.12771221457023757,
-    "fuelLubeRepairs": -0.41887727266024755,
-    "operatingInterest": -0.29629269898401284,
-    "cashOverhead": 0.10060306599640936,
-    "nonCashOverhead": 0.13079262837716932,
-    "total": -0.1103448275862069
+    "labor": -1,
+    "pesticides": -0.48111035883547737,
+    "fertilizer": -0.3233555767397523,
+    "water": -0.704002067271064,
+    "custom": -1,
+    "fuelLubeRepairs": 0.427901558606249,
+    "operatingInterest": -0.68426877628292,
+    "cashOverhead": 0.25783207542446773,
+    "nonCashOverhead": -0.261406333870102,
+    "total": -0.4
    }
   },
   {
@@ -49,16 +49,16 @@
    "oldYear": 2013,
    "newYear": 2020,
    "errors": {
-    "labor": -0.1207402998828884,
-    "pesticides": -0.20768391255414204,
-    "fertilizer": -0.5082444228903976,
-    "water": -0.7188061323262338,
-    "custom": 0.40195304812401406,
-    "fuelLubeRepairs": -0.05476734612764034,
-    "operatingInterest": -0.09532349656360779,
-    "cashOverhead": -0.7138208195573579,
-    "nonCashOverhead": 0.9503897944720054,
-    "total": -0.1170547514159849
+    "labor": -1,
+    "pesticides": -1,
+    "fertilizer": -0.26783058519236985,
+    "water": -0.9304914034963724,
+    "custom": -1,
+    "fuelLubeRepairs": 11.714810924369747,
+    "operatingInterest": -0.7958339601970397,
+    "cashOverhead": -0.7416052060080999,
+    "nonCashOverhead": 0.34939759036144563,
+    "total": -0.49276274386406543
    }
   },
   {
@@ -69,17 +69,17 @@
    "oldYear": 2015,
    "newYear": 2020,
    "errors": {
-    "labor": -0.13024156791248886,
-    "pesticides": 0.07741330834114336,
-    "fertilizer": -0.25138427464008856,
-    "water": -0.026589580782388274,
-    "custom": -0.008563461907988104,
-    "otherMaterials": 0.08156713246401306,
-    "fuelLubeRepairs": -0.00962827690390051,
-    "operatingInterest": -0.06582441823429015,
-    "cashOverhead": -0.4156728219415202,
-    "nonCashOverhead": 1.3168355012384498,
-    "total": 0.1306941431670282
+    "labor": -1,
+    "pesticides": -0.9371508903467667,
+    "fertilizer": 0.20385501780850612,
+    "water": -0.5890044896636751,
+    "custom": -0.6394776225119957,
+    "otherMaterials": 27.13884430176565,
+    "fuelLubeRepairs": -0.5022299939092677,
+    "operatingInterest": -0.8762933734893863,
+    "cashOverhead": -0.42690988305802946,
+    "nonCashOverhead": 0.33889028966376455,
+    "total": -0.32212581344902386
    }
   },
   {
@@ -91,17 +91,17 @@
    "newYear": 2024,
    "errors": {
     "labor": 2.048553006447743,
-    "pesticides": 3.1197674571429825,
+    "pesticides": 2.137400934902896,
     "fertilizer": 3.0545753421152773,
-    "water": 0.1613992058003561,
+    "water": -0.3977203442893422,
     "pollination": 1.3214905296121988,
-    "custom": 1.0584286784759858,
-    "otherMaterials": 367.59044868866965,
-    "fuelLubeRepairs": 10.895839568991322,
-    "operatingInterest": 4.384854287145698,
+    "custom": 0.5177577770623877,
+    "otherMaterials": 42.76264822134388,
+    "fuelLubeRepairs": 20.627057767135582,
+    "operatingInterest": 4.027889949717809,
     "cashOverhead": 1.9459997546283088,
-    "nonCashOverhead": -1,
-    "total": -0.4988972721996518
+    "nonCashOverhead": 0.9940659305374252,
+    "total": -0.4681369704004643
    }
   },
   {
@@ -112,18 +112,18 @@
    "oldYear": 2011,
    "newYear": 2024,
    "errors": {
-    "labor": 0.23340830709251736,
-    "pesticides": -0.05620807941855511,
-    "fertilizer": -0.024196720682343534,
-    "water": -0.7037647296015983,
-    "pollination": -0.07140378815512051,
-    "custom": -0.35143737162270167,
-    "otherMaterials": -1,
-    "fuelLubeRepairs": -0.003891050583657847,
-    "operatingInterest": -0.3688510087956418,
-    "cashOverhead": -0.21025342470296773,
-    "nonCashOverhead": -0.4117861363835644,
-    "total": -0.3168891468369124
+    "labor": 2.048553006447743,
+    "pesticides": 2.137400934902896,
+    "fertilizer": 2.265559489201662,
+    "water": 0.5596492713028434,
+    "pollination": 1.3214905296121988,
+    "custom": 0.5177577770623877,
+    "otherMaterials": 42.76264822134388,
+    "fuelLubeRepairs": 19.439389404369944,
+    "operatingInterest": 3.94698570588672,
+    "cashOverhead": 2.270191666206089,
+    "nonCashOverhead": 1.1489692255823225,
+    "total": -0.43087637840975046
    }
   },
   {
@@ -135,16 +135,16 @@
    "newYear": 2024,
    "errors": {
     "labor": 0.5264000000000001,
-    "pesticides": 1.0251638316601903,
+    "pesticides": 0.15455216382276793,
     "fertilizer": 0.9294283098471903,
     "water": 0.5236643864488348,
     "pollination": 1.9362123890707315,
-    "custom": 1.4288093396222317,
-    "fuelLubeRepairs": 12.926728777699417,
-    "operatingInterest": 6.219780386859155,
+    "custom": 1.088223731088308,
+    "fuelLubeRepairs": 19.811105749600983,
+    "operatingInterest": 5.948198971673903,
     "cashOverhead": 3.2183288965239725,
     "nonCashOverhead": 0.7575630273114197,
-    "total": -0.44743589743589746
+    "total": -0.448974358974359
    }
   },
   {
@@ -178,17 +178,17 @@
    "newYear": 2024,
    "errors": {
     "labor": 0.18570545962995472,
-    "pesticides": 4.266681197614284,
-    "fertilizer": 3.0000597973723333,
-    "water": 2.110056964913089,
+    "pesticides": 3.8084054926982005,
+    "fertilizer": 2.9742529599699306,
+    "water": 2.0641588396930013,
     "pollination": 0.9552601343757022,
-    "custom": -0.2943592668513566,
-    "otherMaterials": 104.32297113373768,
-    "fuelLubeRepairs": 11.074844074844075,
-    "operatingInterest": -1,
-    "cashOverhead": -1,
-    "nonCashOverhead": -1,
-    "total": -1
+    "custom": 0.5179217057120336,
+    "otherMaterials": 67.72756622516556,
+    "fuelLubeRepairs": 23.76507276507277,
+    "operatingInterest": 4.7226074996079594,
+    "cashOverhead": 2.8717149255342056,
+    "nonCashOverhead": 1.0683321401476706,
+    "total": -0.37330237957051654
    }
   },
   {
@@ -200,16 +200,16 @@
    "newYear": 2024,
    "errors": {
     "labor": -0.17507989464442505,
-    "pesticides": 2.7626521162882773,
-    "fertilizer": 2.3589770741780045,
-    "water": 2.519265519208107,
+    "pesticides": 2.3989156066578308,
+    "fertilizer": 2.332318525970244,
+    "water": 2.4584487187609616,
     "pollination": 2.351874516072632,
-    "custom": -0.2969570086249874,
-    "fuelLubeRepairs": 6.3196644920782825,
-    "operatingInterest": -1,
+    "custom": 4.256559875013882,
+    "fuelLubeRepairs": 9.712022367194779,
+    "operatingInterest": 5.914359021420991,
     "cashOverhead": -1,
-    "nonCashOverhead": -1,
-    "total": -1
+    "nonCashOverhead": 1.3406670567583385,
+    "total": -0.38794871794871794
    }
   },
   {
@@ -221,17 +221,17 @@
    "newYear": 2024,
    "errors": {
     "labor": 0.1679256442754542,
-    "pesticides": 6.854229750289926,
-    "fertilizer": 3.5640092131659116,
-    "water": 2.179675104854419,
+    "pesticides": 3.136960708167977,
+    "fertilizer": 3.5067940542737643,
+    "water": 2.1364729974515067,
     "pollination": 1.044899750404564,
-    "custom": 1.9098442923511418,
-    "otherMaterials": 161.5652440863782,
-    "fuelLubeRepairs": 4.311933967671673,
-    "operatingInterest": 7.479643188326349,
+    "custom": 2.083901033508293,
+    "otherMaterials": 96.47608503100089,
+    "fuelLubeRepairs": 39.8813481600367,
+    "operatingInterest": 7.733718332820079,
     "cashOverhead": 2.9979312034973122,
     "nonCashOverhead": 2.386819270419276,
-    "total": -0.16784677887405688
+    "total": -0.16517701683110853
    }
   },
   {
@@ -243,17 +243,17 @@
    "newYear": 2024,
    "errors": {
     "labor": 2.3342008167863684,
-    "pesticides": 7.990894679164584,
-    "fertilizer": 2.058810417695573,
-    "water": 6.653685347500125,
+    "pesticides": 7.571203013118558,
+    "fertilizer": 2.019199923077932,
+    "water": 6.626035998762261,
     "pollination": 1.044899750404564,
-    "custom": 2.119139514846857,
-    "otherMaterials": 126.25733070315388,
-    "fuelLubeRepairs": 9.4771294279491,
-    "operatingInterest": 12.15071368449956,
+    "custom": 2.1458353340427383,
+    "otherMaterials": 107.85323294951286,
+    "fuelLubeRepairs": 16.344491573999775,
+    "operatingInterest": 12.189737810763898,
     "cashOverhead": 2.6459538716279467,
     "nonCashOverhead": 2.0606511363195397,
-    "total": -0.008473592571096924
+    "total": -0.0071967498549042365
    }
   },
   {
@@ -265,16 +265,16 @@
    "newYear": 2024,
    "errors": {
     "labor": -0.24679543726235728,
-    "pesticides": 5.460314790340022,
-    "fertilizer": 2.6314522355108303,
-    "water": 3.171213861011859,
+    "pesticides": 4.581434209188624,
+    "fertilizer": 2.590534463843101,
+    "water": 3.113969388994312,
     "pollination": 2.2134138934928864,
-    "custom": 5.918904568163466,
-    "fuelLubeRepairs": 6.263682614728404,
-    "operatingInterest": 10.294810007080551,
+    "custom": 6.362816586917314,
+    "fuelLubeRepairs": 17.648440310396218,
+    "operatingInterest": 10.385077287852116,
     "cashOverhead": -1,
     "nonCashOverhead": 3.2828440999424338,
-    "total": -0.15935897435897436
+    "total": -0.15679487179487178
    }
   },
   {
@@ -288,9 +288,9 @@
     "labor": -0.541133318362153,
     "pesticides": 0.6327931161906772,
     "fertilizer": 0.8937896754102287,
-    "water": -0.4073306990953941,
+    "water": -0.4746794832890993,
     "custom": 0.8380629568746302,
-    "otherMaterials": -0.3974896363392805,
+    "otherMaterials": -0.2355244848175817,
     "fuelLubeRepairs": -0.4050909985243483,
     "operatingInterest": -0.06255038425532171,
     "cashOverhead": 0.10961873560468134,
@@ -309,9 +309,9 @@
     "labor": -0.5009824837188412,
     "pesticides": 0.6327931161906772,
     "fertilizer": 0.8937896754102287,
-    "water": -0.4073306990953941,
+    "water": -0.4746794832890993,
     "custom": 0.9794524150957554,
-    "otherMaterials": 0.25004749639896534,
+    "otherMaterials": 0.5860817696244937,
     "fuelLubeRepairs": -0.4050909985243483,
     "operatingInterest": 0.005607836007913316,
     "cashOverhead": 0.14861492120101197,
@@ -330,14 +330,96 @@
     "labor": -0.5640766524440454,
     "pesticides": 0.6327931161906772,
     "fertilizer": 0.831357048748353,
-    "water": -0.4073306990953941,
+    "water": -0.4746794832890993,
     "custom": 0.6843787631560153,
-    "otherMaterials": -0.3661571944325912,
+    "otherMaterials": -0.19576934347361033,
     "fuelLubeRepairs": -0.5222700442695525,
     "operatingInterest": -0.5311976151576728,
     "cashOverhead": -0.0002796056213414007,
     "nonCashOverhead": -0.7863304873710423,
     "total": -0.17659137577002054
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin sacramento",
+   "oldId": "beans-2016babylimabeansjvfinaldraftaug15",
+   "newId": "beans-2023-baby-lima-final",
+   "oldYear": 2016,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.10768024472531904,
+    "pesticides": -0.540656687590536,
+    "water": 0.14483894980842849,
+    "custom": 0.02656162357651591,
+    "otherMaterials": 0.017877014964310843,
+    "fuelLubeRepairs": 0.0026406736298708855,
+    "operatingInterest": -0.2429171648043756,
+    "cashOverhead": 0.0010191042340667964,
+    "nonCashOverhead": -0.13574997342404593,
+    "total": -0.001834350629150123
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin sacramento",
+   "oldId": "beans-2016largelimabeansjvfinaldraftaug15",
+   "newId": "beans-2023-baby-lima-final",
+   "oldYear": 2016,
+   "newYear": 2023,
+   "errors": {
+    "labor": -0.10768024472531904,
+    "pesticides": -0.540656687590536,
+    "water": 0.14483894980842849,
+    "custom": -0.028778625672891984,
+    "otherMaterials": 1.0238290470333893,
+    "fuelLubeRepairs": 0.0026406736298708855,
+    "operatingInterest": -0.14325824536829787,
+    "cashOverhead": 0.19281541554400602,
+    "nonCashOverhead": -0.13574997342404593,
+    "total": 0.09953765782388084
+   }
+  },
+  {
+   "commodity": "beans",
+   "region": "joaquin sacramento",
+   "oldId": "beans-2018garbanzobeansacvalfinaldraft22018",
+   "newId": "beans-2023-baby-lima-final",
+   "oldYear": 2018,
+   "newYear": 2023,
+   "errors": {
+    "labor": 0.465040510616679,
+    "pesticides": -0.5606207565470417,
+    "water": -0.4085695213954723,
+    "custom": -0.5630789458113447,
+    "otherMaterials": 0.4898502805857118,
+    "fuelLubeRepairs": 0.28177356141147614,
+    "operatingInterest": 0.05696656652710027,
+    "cashOverhead": -0.27838226122912857,
+    "nonCashOverhead": 2.045784367852354,
+    "total": -0.10052455991675699
+   }
+  },
+  {
+   "commodity": "blackberries",
+   "region": "benito cruz monterey santa",
+   "oldId": "blackberries-bpblackberrycc2018-final-1",
+   "newId": "blackberries-2024blackberries-correctedfinal-april2024",
+   "oldYear": 2018,
+   "newYear": 2024,
+   "errors": {
+    "labor": -1,
+    "pesticides": -1,
+    "fertilizer": -1,
+    "water": -1,
+    "pollination": -1,
+    "custom": 1.8747070554097207,
+    "otherMaterials": 2.4302084986856594,
+    "fuelLubeRepairs": -1,
+    "operatingInterest": 1.0125819662334967,
+    "cashOverhead": 1.2102151365501994,
+    "nonCashOverhead": 0.8041367831987908,
+    "total": 0.029010492893111403
    }
   },
   {
@@ -370,17 +452,17 @@
    "newYear": 2017,
    "errors": {
     "labor": 0.028528866777505834,
-    "pesticides": 3.447906043728217,
-    "fertilizer": 8.800542477961832,
+    "pesticides": 2.7807201371689847,
+    "fertilizer": 8.712841874132197,
     "water": 3.3444214122398868,
     "pollination": 0.737768564895955,
-    "custom": 79.85511300854964,
-    "otherMaterials": -0.8532989371278605,
-    "fuelLubeRepairs": 2.1494098573281453,
-    "operatingInterest": 0.4917241898481455,
+    "custom": 75.11245296685442,
+    "otherMaterials": -0.8742943364986042,
+    "fuelLubeRepairs": 6.115473411154344,
+    "operatingInterest": 0.3922127776814823,
     "cashOverhead": 1.104817478277194,
     "nonCashOverhead": 1.342566692246123,
-    "total": -0.6494430861179027
+    "total": -0.652105406139636
    }
   },
   {
@@ -392,16 +474,16 @@
    "newYear": 2021,
    "errors": {
     "labor": 5.80564746732026,
-    "pesticides": 1.8764164500840856,
+    "pesticides": 0.2026937777098303,
     "fertilizer": -0.35351542531879915,
     "water": 1.1098022000148973,
     "custom": 7.916847756071987,
-    "otherMaterials": 62.84334684421766,
-    "fuelLubeRepairs": -0.0537043103851736,
-    "operatingInterest": 15.917293006444943,
+    "otherMaterials": 60.151069446657665,
+    "fuelLubeRepairs": 4.011201073306188,
+    "operatingInterest": 15.795580414383442,
     "cashOverhead": 1.707080297340392,
     "nonCashOverhead": 0.2744564854410801,
-    "total": -0.20518902891030394
+    "total": -0.20993328391401037
    }
   },
   {
@@ -413,14 +495,14 @@
    "newYear": 2020,
    "errors": {
     "labor": 0.3133082560477334,
-    "pesticides": -0.49665313610538253,
-    "fertilizer": 35.979980934223065,
+    "pesticides": -0.5145871098783498,
+    "fertilizer": 34.0467111534795,
     "water": 37.893639107800816,
     "otherMaterials": 0.7958776245031527,
-    "operatingInterest": 10.595965702168698,
+    "operatingInterest": 10.575132977731016,
     "cashOverhead": 1.0109800645660616,
     "nonCashOverhead": 0.6187086513006219,
-    "total": -0.5033436508846345
+    "total": -0.5033818640376018
    }
   },
   {
@@ -432,16 +514,16 @@
    "newYear": 2021,
    "errors": {
     "labor": 6.377914349819529,
-    "pesticides": 2.449674459899379,
+    "pesticides": 0.8600887836638057,
     "fertilizer": -0.12450980392156874,
-    "water": 2.931867280672921,
-    "custom": 9.44458672475927,
-    "otherMaterials": 53.935049181516426,
-    "fuelLubeRepairs": 9.880520466118293,
-    "operatingInterest": 20.54470879214683,
+    "water": 2.8825132980703305,
+    "custom": 9.460292870210033,
+    "otherMaterials": 51.2885041800872,
+    "fuelLubeRepairs": 16.212703192322756,
+    "operatingInterest": 20.720401604385938,
     "cashOverhead": 1.7872774742355293,
     "nonCashOverhead": 0.48683799761204466,
-    "total": -0.14069681245366938
+    "total": -0.12928094885100075
    }
   },
   {
@@ -452,17 +534,17 @@
    "oldYear": 2010,
    "newYear": 2015,
    "errors": {
-    "labor": -0.06396801934963699,
-    "pesticides": 0.07850683834449082,
-    "fertilizer": 0.25638885102903075,
-    "water": 0.14300783365272624,
-    "custom": 0.3822504964605197,
-    "otherMaterials": -0.31774027775558494,
-    "fuelLubeRepairs": -0.3476973684210527,
-    "operatingInterest": 0.2810545244901796,
-    "cashOverhead": -0.3898568100851306,
-    "nonCashOverhead": -0.1263912181735022,
-    "total": 0.20714924039320823
+    "labor": 0.2161045417898415,
+    "pesticides": 1.2067909153818035,
+    "fertilizer": 2.938394439144064,
+    "water": 3.4137946094807767,
+    "custom": 0.5458926380959706,
+    "otherMaterials": 17.346971027216856,
+    "fuelLubeRepairs": 25.76113360323886,
+    "operatingInterest": 0.893225426562159,
+    "cashOverhead": 1.5680248926639169,
+    "nonCashOverhead": 2.061034406971287,
+    "total": -0.2357462019660411
    }
   },
   {
@@ -516,15 +598,15 @@
    "newYear": 2016,
    "errors": {
     "labor": -0.3650165623849833,
-    "pesticides": 1.4116594864120744,
+    "pesticides": 0.8382133733946726,
     "fertilizer": 1.48736872465686,
     "water": 1.2400491485498113,
-    "custom": -0.3382002954605383,
-    "fuelLubeRepairs": 1.1319645666031959,
-    "operatingInterest": 3.176791773217106,
+    "custom": -0.31501622937794577,
+    "fuelLubeRepairs": 7.503352926566767,
+    "operatingInterest": 2.9589440691003954,
     "cashOverhead": 3.4273727878355067,
     "nonCashOverhead": 2.936285673059428,
-    "total": -0.46172248803827753
+    "total": -0.46750398724082937
    }
   },
   {
@@ -536,15 +618,15 @@
    "newYear": 2021,
    "errors": {
     "labor": -0.3253006123830743,
-    "pesticides": -0.09189927855147616,
+    "pesticides": -0.3733354525541179,
     "fertilizer": 2.097390250527591,
     "water": 1.55602331651638,
-    "custom": -0.45066883443827477,
-    "otherMaterials": 4.295369930613594,
-    "fuelLubeRepairs": 32.366821104387284,
-    "operatingInterest": 0.5784271120913893,
-    "cashOverhead": 9.981715321863758,
-    "nonCashOverhead": 4.47672468473505,
+    "custom": -0.39733037291726636,
+    "otherMaterials": 2.286307008114038,
+    "fuelLubeRepairs": 58.519194402420574,
+    "operatingInterest": 0.5906195124554428,
+    "cashOverhead": 5.17264192531167,
+    "nonCashOverhead": 2.635873012460089,
     "total": -0.4043904013773808
    }
   },
@@ -564,9 +646,9 @@
     "otherMaterials": -0.002538308401139591,
     "fuelLubeRepairs": -0.5218394750896468,
     "operatingInterest": -0.2310174216654011,
-    "cashOverhead": -0.6610308316396395,
-    "nonCashOverhead": -0.23640688650352354,
-    "total": -0.24631318248339526
+    "cashOverhead": -0.692550952827705,
+    "nonCashOverhead": -0.5570405509568782,
+    "total": -0.2528425081616571
    }
   },
   {
@@ -578,16 +660,16 @@
    "newYear": 2017,
    "errors": {
     "labor": 1.6039693209104267,
-    "pesticides": 5.405435953251715,
-    "fertilizer": 1.2817817817817818,
-    "water": 3.189263504659891,
-    "custom": -0.18528223899231566,
-    "otherMaterials": 52.98943409051956,
-    "fuelLubeRepairs": 0.5373416876478218,
-    "operatingInterest": 2.945828186790095,
+    "pesticides": 4.818037896403305,
+    "fertilizer": 1.2429429429429428,
+    "water": 0.7688001464119542,
+    "custom": -0.30626893647165837,
+    "otherMaterials": 12.463310254052905,
+    "fuelLubeRepairs": 3.525844968337531,
+    "operatingInterest": 2.6864635980176854,
     "cashOverhead": 0.0971368940421139,
-    "nonCashOverhead": -1,
-    "total": -0.5307891478104244
+    "nonCashOverhead": 0.7373494692396897,
+    "total": -0.5304514240684454
    }
   },
   {
@@ -607,8 +689,8 @@
     "fuelLubeRepairs": -0.506578947368421,
     "operatingInterest": -0.6019629938042076,
     "cashOverhead": 0.31295114778865313,
-    "nonCashOverhead": -0.35889363215937387,
-    "total": -0.2079483912073909
+    "nonCashOverhead": -0.6735935355999391,
+    "total": -0.22013380057343102
    }
   },
   {
@@ -620,16 +702,16 @@
    "newYear": 2020,
    "errors": {
     "labor": 1.1829231236706164,
-    "pesticides": 1.2704394602714044,
-    "fertilizer": 3.5673970659599075,
+    "pesticides": 0.3750548843897242,
+    "fertilizer": 3.5169285900929474,
     "water": 0.9880407662491976,
-    "custom": 0.707867098816894,
-    "otherMaterials": 22.996030677330285,
-    "fuelLubeRepairs": 7.23641156011666,
-    "operatingInterest": 3.4440487664618566,
+    "custom": 0.8616735738544391,
+    "otherMaterials": 18.5825158654938,
+    "fuelLubeRepairs": 13.066877739133155,
+    "operatingInterest": 3.406016680021489,
     "cashOverhead": 6.851653439133215,
     "nonCashOverhead": 1.4259822382969247,
-    "total": -0.416208104052026
+    "total": -0.41654160413540103
    }
   },
   {
@@ -644,12 +726,12 @@
     "pesticides": 0.25981368732182136,
     "fertilizer": 0.2516893293974177,
     "water": 0.27957097834273764,
-    "custom": 0.08469006073263906,
+    "custom": 0.08469006073263882,
     "otherMaterials": -0.04995046734351619,
-    "fuelLubeRepairs": -0.1481694691178828,
+    "fuelLubeRepairs": -0.14816946911788298,
     "operatingInterest": -0.015435574465400755,
-    "cashOverhead": 262.49060277715586,
-    "nonCashOverhead": 965.9187512119448,
+    "cashOverhead": -0.46282663668382085,
+    "nonCashOverhead": 0.9761415701099468,
     "total": -0.0116856806119384
    }
   },
@@ -665,12 +747,12 @@
     "pesticides": 0.4101323659227206,
     "fertilizer": 0.2516893293974177,
     "water": 0.27957097834273764,
-    "custom": 0.08469006073263906,
+    "custom": 0.08469006073263882,
     "otherMaterials": -0.12493104433878878,
-    "fuelLubeRepairs": -0.1481694691178828,
+    "fuelLubeRepairs": -0.14816946911788298,
     "operatingInterest": -0.015508045398425997,
-    "cashOverhead": 262.49060277715586,
-    "nonCashOverhead": 965.9187512119448,
+    "cashOverhead": -0.46282663668382085,
+    "nonCashOverhead": 0.9761415701099468,
     "total": -0.011428908899964365
    }
   },
@@ -682,18 +764,18 @@
    "oldYear": 2012,
    "newYear": 2022,
    "errors": {
-    "labor": 8.406814736203758,
-    "pesticides": 12.505451622737725,
-    "fertilizer": 1.911170812028771,
+    "labor": 7.5435187992722845,
+    "pesticides": 9.588692109420466,
+    "fertilizer": 1.8947049137706895,
     "water": 0.8413083436706607,
     "pollination": 0.6785703033379424,
-    "custom": 0.7241163363315695,
-    "otherMaterials": 11.92115344813155,
-    "fuelLubeRepairs": 7.988946801880909,
-    "operatingInterest": 7.557224248317814,
+    "custom": 0.7749687032662017,
+    "otherMaterials": 12.853217447437899,
+    "fuelLubeRepairs": 12.50170528581951,
+    "operatingInterest": 7.486763515644829,
     "cashOverhead": 6.169056053026584,
     "nonCashOverhead": 1.4094077344832638,
-    "total": -0.3172055166176803
+    "total": -0.3221795161654985
    }
   },
   {
@@ -719,6 +801,28 @@
    }
   },
   {
+   "commodity": "raspberries",
+   "region": "benito cruz monterey santa",
+   "oldId": "raspberries-bpraspberry-cc-finaldraft",
+   "newId": "raspberries-23raspberry-fullfinal-dec2023",
+   "oldYear": 2017,
+   "newYear": 2023,
+   "errors": {
+    "labor": -1,
+    "pesticides": -1,
+    "fertilizer": -1,
+    "water": -1,
+    "pollination": -1,
+    "custom": 3.6700599934264164,
+    "otherMaterials": 3.0361542060203197,
+    "fuelLubeRepairs": -1,
+    "operatingInterest": 5.245196556353931,
+    "cashOverhead": 5.185621367771677,
+    "nonCashOverhead": 3.511147001284118,
+    "total": 0.04761135414595347
+   }
+  },
+  {
    "commodity": "rice",
    "region": "sacramento",
    "oldId": "rice-ricesv2012",
@@ -734,7 +838,7 @@
     "otherMaterials": 0.2296615436591983,
     "fuelLubeRepairs": -0.39629632229534245,
     "operatingInterest": 0.09209720537056738,
-    "cashOverhead": -0.3131299009250303,
+    "cashOverhead": -0.31312990092503035,
     "nonCashOverhead": 0.2982316948561674,
     "total": -0.17710680486705724
    }
@@ -771,9 +875,9 @@
     "labor": -0.4657840138272642,
     "pesticides": -0.26163804461952267,
     "fertilizer": -0.16547170389435317,
-    "water": 0.8370716869476068,
+    "water": -0.35507057798647845,
     "custom": -0.45914345187975175,
-    "otherMaterials": -0.21553138714646355,
+    "otherMaterials": -0.15323955509222545,
     "fuelLubeRepairs": -0.3668049792531121,
     "operatingInterest": -0.6030206040449783,
     "cashOverhead": 0.19284067742229985,
@@ -792,9 +896,9 @@
     "labor": -0.5331301068306711,
     "pesticides": -0.27960789852552465,
     "fertilizer": -0.04504068021509891,
-    "water": -0.13298043646521915,
+    "water": -0.6956207915250238,
     "custom": -0.7624749958243394,
-    "otherMaterials": -0.6357949634726623,
+    "otherMaterials": -0.6068747509913194,
     "fuelLubeRepairs": -0.4969181653532078,
     "operatingInterest": -0.7239098101492802,
     "cashOverhead": 0.08604820065136685,
@@ -813,9 +917,9 @@
     "labor": 2.4237129489387583,
     "pesticides": -0.16841503730597548,
     "fertilizer": 1.0801475191963488,
-    "water": -0.04644238967695855,
+    "water": -0.5027170139522597,
     "custom": -0.9373695696045677,
-    "otherMaterials": -0.12505160807716065,
+    "otherMaterials": -0.08305662478334616,
     "fuelLubeRepairs": 0.6599222015896004,
     "operatingInterest": -0.6011344963861688,
     "cashOverhead": 0.16699151279617477,
@@ -834,9 +938,9 @@
     "labor": -0.27651713379697584,
     "pesticides": -0.21106446712225074,
     "fertilizer": 0.19385026737967914,
-    "water": -0.15447155825306047,
+    "water": 0.02813096467327999,
     "custom": -0.130063835728884,
-    "otherMaterials": -0.09465876733253194,
+    "otherMaterials": -0.11225321787786356,
     "fuelLubeRepairs": -0.051471284562570815,
     "operatingInterest": -0.4702181026673635,
     "cashOverhead": 0.022401888705865583,
@@ -852,17 +956,39 @@
    "oldYear": 2019,
    "newYear": 2024,
    "errors": {
-    "labor": -0.6011966272865503,
+    "labor": 0.6454527612853286,
     "pesticides": -0.41250550909628514,
     "fertilizer": 1.5343355720053198,
-    "water": -0.07942331236332724,
+    "water": 0.18547049973881535,
     "custom": -0.4723777346799703,
-    "otherMaterials": -0.02400704289427075,
-    "fuelLubeRepairs": 0.5072259249297933,
-    "operatingInterest": -0.5556438156936025,
+    "otherMaterials": -0.04775351216937727,
+    "fuelLubeRepairs": 0.9263167833324031,
+    "operatingInterest": -0.4832177076767848,
     "cashOverhead": 0.1728769103228602,
     "nonCashOverhead": 1.0141247687909871,
-    "total": -0.3200525316343372
+    "total": -0.2220437645304985
+   }
+  },
+  {
+   "commodity": "sunflowers",
+   "region": "sacramento",
+   "oldId": "sunflowers-sunflowersv2011",
+   "newId": "sunflowers-2018sunflowerssacval-finaldraft-92618",
+   "oldYear": 2011,
+   "newYear": 2018,
+   "errors": {
+    "labor": -0.6644999250262408,
+    "pesticides": -0.6909117583272737,
+    "fertilizer": -1,
+    "water": -0.6372472490776142,
+    "pollination": -0.2307878299017326,
+    "custom": 0.19360509153179423,
+    "otherMaterials": 0.5722384446989118,
+    "fuelLubeRepairs": -0.5320707684824904,
+    "operatingInterest": -0.6130356097836435,
+    "cashOverhead": -0.07800882284534867,
+    "nonCashOverhead": -0.7070824206502598,
+    "total": -0.45849056603773586
    }
   },
   {
@@ -873,11 +999,15 @@
    "oldYear": 2017,
    "newYear": 2023,
    "errors": {
-    "labor": 19.85520089477759,
-    "water": 26.400457890835217,
-    "otherMaterials": 33.249284925471656,
-    "fuelLubeRepairs": 37.53641551786206,
-    "cashOverhead": 0.14884364981166479,
+    "labor": -0.33173832725501956,
+    "pesticides": -0.3713469387755103,
+    "fertilizer": -0.23342518704820425,
+    "water": -0.3075696561882797,
+    "custom": 0.35271417354507867,
+    "otherMaterials": -0.23035314774220997,
+    "fuelLubeRepairs": -0.2808133962451871,
+    "operatingInterest": -0.5933526428153558,
+    "cashOverhead": -0.22293957213904889,
     "nonCashOverhead": -0.02994002533548483,
     "total": -0.18559451219512196
    }
@@ -891,16 +1021,16 @@
    "newYear": 2022,
    "errors": {
     "labor": 7.69013246519982,
-    "pesticides": 8.21732299713164,
-    "fertilizer": 2.5463828808611497,
+    "pesticides": 7.057199457968484,
+    "fertilizer": 2.501277852169752,
     "water": 0.7624988185048396,
-    "custom": 0.40272552664599354,
-    "otherMaterials": 40.70212236441024,
-    "fuelLubeRepairs": 17.035451865025497,
-    "operatingInterest": 11.681187430536143,
+    "custom": 0.7603191563034482,
+    "otherMaterials": 28.00023342670401,
+    "fuelLubeRepairs": 27.805365750924317,
+    "operatingInterest": 11.645395123789744,
     "cashOverhead": 4.151451309566424,
     "nonCashOverhead": 1.1969725461742597,
-    "total": -0.5239762931034483
+    "total": -0.5255926724137931
    }
   },
   {
@@ -912,16 +1042,16 @@
    "newYear": 2023,
    "errors": {
     "labor": 7.85131455166609,
-    "pesticides": 18.26205180477275,
-    "fertilizer": 8.426660133790635,
+    "pesticides": 16.813436862933198,
+    "fertilizer": 8.348365614406994,
     "water": -1,
-    "custom": 1.1059269914684762,
-    "otherMaterials": 52.897206848344425,
-    "fuelLubeRepairs": 38.68425605536332,
-    "operatingInterest": 18.4557185384269,
+    "custom": 2.198314420339983,
+    "otherMaterials": 3.4856347773766543,
+    "fuelLubeRepairs": 105.6176470588236,
+    "operatingInterest": 17.9890629577693,
     "cashOverhead": 26.2424443315056,
     "nonCashOverhead": -1,
-    "total": -0.4541044776119403
+    "total": -0.4588308457711443
    }
   },
   {
@@ -933,16 +1063,16 @@
    "newYear": 2022,
    "errors": {
     "labor": 1.4524275087504435,
-    "pesticides": 6.938606812366786,
-    "fertilizer": 4.606560061360532,
+    "pesticides": 6.451332561622394,
+    "fertilizer": 4.508314265892766,
     "water": 3.0351599153401776,
-    "custom": 0.9913258287529512,
-    "otherMaterials": 33.071185828287234,
-    "fuelLubeRepairs": 9.402387686640795,
-    "operatingInterest": 7.920452734163707,
+    "custom": 2.3073555820676503,
+    "otherMaterials": 3.905793123722399,
+    "fuelLubeRepairs": 16.811435243044127,
+    "operatingInterest": 8.318089890542785,
     "cashOverhead": 6.644663264614173,
     "nonCashOverhead": 3.724753459819608,
-    "total": -0.1749730603448276
+    "total": -0.1732219827586207
    }
   },
   {
@@ -954,67 +1084,67 @@
    "newYear": 2023,
    "errors": {
     "labor": 3.5062783863211315,
-    "pesticides": 25.84599078341013,
+    "pesticides": 21.61520737327189,
     "fertilizer": 23.14912773484353,
-    "water": 0.04619930128643558,
-    "custom": 1.4566983230492454,
-    "otherMaterials": 55.78875394239085,
-    "fuelLubeRepairs": 78.63374028856826,
-    "operatingInterest": 24.10464029438545,
+    "water": -0.03129694325330029,
+    "custom": 2.6613623183030013,
+    "otherMaterials": 3.5383597883597884,
+    "fuelLubeRepairs": 248.23065281000896,
+    "operatingInterest": 24.93005542513796,
     "cashOverhead": 45.48535393420302,
     "nonCashOverhead": -1,
-    "total": -0.09577114427860696
+    "total": -0.08967661691542289
    }
   }
  ],
  "medians": {
   "labor": {
-   "medianAbs": 0.4657840138272642,
-   "n": 46
+   "medianAbs": 0.5331301068306711,
+   "n": 52
   },
   "pesticides": {
-   "medianAbs": 0.5719160460392688,
-   "n": 45
+   "medianAbs": 0.6327931161906772,
+   "n": 52
   },
   "fertilizer": {
-   "medianAbs": 0.8937896754102287,
-   "n": 45
+   "medianAbs": 1,
+   "n": 49
   },
   "water": {
-   "medianAbs": 0.5519699446130047,
-   "n": 46
+   "medianAbs": 0.6372472490776142,
+   "n": 52
   },
   "pollination": {
-   "medianAbs": 1.044899750404564,
-   "n": 12
+   "medianAbs": 1,
+   "n": 15
   },
   "custom": {
-   "medianAbs": 0.4723777346799703,
-   "n": 44
+   "medianAbs": 0.6597942864457012,
+   "n": 51
   },
   "otherMaterials": {
-   "medianAbs": 0.6357949634726623,
-   "n": 39
+   "medianAbs": 0.7958776245031527,
+   "n": 45
   },
   "fuelLubeRepairs": {
-   "medianAbs": 0.5218394750896468,
-   "n": 45
+   "medianAbs": 0.9263167833324031,
+   "n": 51
   },
   "operatingInterest": {
-   "medianAbs": 0.6011344963861688,
-   "n": 45
+   "medianAbs": 0.7463805368836335,
+   "n": 52
   },
   "cashOverhead": {
-   "medianAbs": 0.7138208195573579,
-   "n": 46
+   "medianAbs": 0.692550952827705,
+   "n": 52
   },
   "nonCashOverhead": {
-   "medianAbs": 0.7863304873710423,
-   "n": 46
+   "medianAbs": 0.7575630273114197,
+   "n": 52
   },
   "total": {
-   "medianAbs": 0.20714924039320823,
-   "n": 46
+   "medianAbs": 0.2220437645304985,
+   "n": 52
   }
  }
 }

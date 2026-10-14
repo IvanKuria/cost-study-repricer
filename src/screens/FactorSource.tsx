@@ -19,7 +19,7 @@ function SourceDetail({ cell, table, series }: { cell: RepricedCell; table: Repr
       <p>Study-period index ({from?.period ?? table.referencePeriod}): {number(cell.indexFrom)}</p>
       <p>Target index ({to?.period ?? table.targetPeriod}): {number(cell.indexTo)}</p>
       <p>{number(cell.indexTo)} ÷ {number(cell.indexFrom)} = {number(cell.indexFrom && cell.indexTo != null ? cell.indexTo / cell.indexFrom : null)}</p>
-    </> : <p>No index applied; the study amount is retained.</p>}
+    </> : <p>{cell.recalculated ? 'Recalculated from other repriced figures, not indexed.' : 'No index applied; the study amount is retained.'}</p>}
     <p>Study cost: {money(cell.original)} per acre.</p>
     {cell.note && <p className="text-ink-2">{cell.note}</p>}
     {cell.overridden && <p>Your edit replaces the automatic adjustment for this component.</p>}
@@ -48,6 +48,7 @@ export function FactorSource({ row, column, table, series, study }: { row: Repri
         <p className="text-ink-2">Material categories are assigned from the operation label. For mixed jobs, the first recognized purpose selects the material index.</p>
       </> : <>
         {cell.category && <p>Cost category: {CATEGORY_LABEL[cell.category]}.</p>}
+        {cell.recalculated && <p>The professor's rule: the yearly establishment charge, and insurance and taxes on the establishment investment, are recalculated the UC way from the repriced establishment cost. The study's printed figure is the study cost below.</p>}
         {cell.category === 'establishmentCpi' && <p>The professor's rule: establishment costs are repriced row by row from the study's establishment table. An establishment figure outside that table, such as this one, is repriced with the CPI, all items.</p>}
         <SourceDetail cell={cell} table={table} series={series} />
       </>}

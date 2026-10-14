@@ -8,10 +8,17 @@ const has = (s: string, words: string[]) => { const n = s.toLowerCase(); return 
 
 const FERTILIZER = ['fertiliz', 'fertigat', 'nitrogen', 'urea', 'un-32', 'un32', 'uan', 'can-17', 'can17', 'compost', 'manure', 'gypsum', 'potash', 'potassium', 'k2so4', 'phosph', 'zinc', 'boron', 'foliar', 'nutrient', 'lime', 'sulfur', 'sulphur', 'micronutrient', 'ammoni', 'calcium nitrate'];
 const PESTICIDES = ['spray', 'fungicid', 'insecticid', 'herbicid', 'miticid', 'nematicid', 'fumig', 'weed', 'pest', 'mite', 'aphid', 'worm', 'botrytis', 'mildew', 'disease', 'insect', 'rodent', 'gopher', 'squirrel', 'vole', 'bait', 'now ', 'mating disruption', 'leafhopper', 'thrip', 'lygus', 'scale', 'bloom spray', 'dormant spray', 'dormant oil', 'defoliat', 'growth regulator', 'gibberellin', 'ethephon', 'biological', 'persimilis', 'predatory', 'sanitation'];
-const WATER = ['irrigat', 'water', 'pump', 'well ', 'sprinkler', 'flush'];
+const WATER = ['irrigat', 'water', 'pump', 'well ', 'sprinkler', 'flush', 'drip'];
 const POLLINATION = ['pollinat', 'bee', 'hive'];
 const SEEDS = ['seed', 'plant', 'transplant', 'tree', 'vine', 'rootstock', 'cutting', 'replant', 'nursery', 'crown', 'tuber', 'bulb', 'clove'];
 const PCA = ['pca', 'cca', 'consult', 'advisor', 'fee'];
+// Field work done with the farm's own machines, named without the words the lists above look for.
+const MACHINE_WORK = ['disc', 'disk', 'roll', 'laser', 'level', 'float', 'subsoil', 'chisel', 'rip ', 'ripping', 'triplane', 'tri-plane', 'plane', 'berm', 'border', 'cultivat', 'list ', 'bed shap', 'make beds', 'utv', 'atv', 'pickup', 'truck', 'tractor', 'hedging', 'topping', 'mow', 'shred', 'spread chips'];
+// Sampling, testing and monitoring services, priced like contracted services.
+const SERVICES = ['sampl', 'analysis', 'monitor', 'survey', 'soil pit', 'test', 'scout', 'pressure chamber'];
+const ASSESSMENTS = ['assessment', 'research board', 'marketing order'];
+// Materials the professor's worksheet prices as other materials (CPI), fruit ripeners included: a recognised kind, not an unmatched label.
+const OTHER_MATERIALS = ['ripener', 'ethrel', 'trellis', 'mulch', 'stake', 'tape', 'box', 'carton', 'tray', 'bag', 'bin', 'pallet', 'wire', 'post'];
 
 const firstIndex = (s: string, words: string[]) => { const n = s.toLowerCase(); const hits = words.map(w => n.indexOf(w)).filter(i => i >= 0); return hits.length ? Math.min(...hits) : Infinity; };
 
@@ -25,6 +32,7 @@ export function materialsCategory(label: string): CellClass {
   let best: { cat: Category; idx: number; part?: CellClass['part'] } | null = null;
   for (const [cat, words, part] of candidates) { const i = firstIndex(label, words); if (i < (best?.idx ?? Infinity)) best = { cat, idx: i, part }; }
   if (best) return { category: best.cat, confidence: 'keyword', ...(best.part ? { part: best.part } : {}) };
+  if (has(label, [...OTHER_MATERIALS, ...ASSESSMENTS, ...MACHINE_WORK, ...SERVICES, 'harvest'])) return { category: 'otherMaterials', confidence: 'keyword' };
   return { category: 'otherMaterials', confidence: 'fallback' };
 }
 
@@ -50,18 +58,21 @@ export function classifyRow(row: OperationRow): { labor: CellClass; fuel: CellCl
 /** A whole establishment-table row (one number per year, not split by column) gets one category from its label. */
 export function rowCategory(label: string, section: string): CellClass {
   const s = (section || '').toLowerCase();
-  if (s.includes('non-cash') || s.includes('noncash')) return { category: 'nonCashOverhead', confidence: 'column' };
+  if (s.includes('non-cash') || s.includes('noncash') || s.includes('capital recovery')) return { category: 'nonCashOverhead', confidence: 'column' };
   if (s.includes('cash overhead')) return { category: 'cashOverhead', confidence: 'column' };
   if (has(label, ['interest on operating'])) return { category: 'operatingInterest', confidence: 'column' };
   if (has(label, ['removal', 'remove', 'leveling', 'soil analysis', 'pca fee']) || /harvest/i.test(section)) return { category: 'custom', confidence: 'keyword' };
-  if (/^rip\b/i.test(label) || has(label, ['pickup truck', 'atv', 'disk', 'mow', 'shred'])) return { category: 'fuelLubeRepairs', confidence: 'keyword', part: 'fuel' };
+  if (has(label, ASSESSMENTS) || /assess/i.test(section)) return { category: 'otherMaterials', confidence: 'keyword' };
+  if (has(label, [...PCA, ...SERVICES])) return { category: 'custom', confidence: 'keyword' };
+  if (/^rip\b/i.test(label) || has(label, MACHINE_WORK)) return { category: 'fuelLubeRepairs', confidence: 'keyword', part: 'fuel' };
   if (has(label, POLLINATION)) return { category: 'pollination', confidence: 'keyword' };
   if (has(label, FERTILIZER)) return { category: 'fertilizer', confidence: 'keyword' };
   if (has(label, PESTICIDES)) return { category: 'pesticides', confidence: 'keyword' };
   if (has(label, WATER)) return { category: 'water', confidence: 'keyword' };
   if (has(label, ['custom', 'contract', 'hire', 'rent', 'haul', 'harvest'])) return { category: 'custom', confidence: 'keyword' };
-  if (has(label, ['prune', 'hand', 'labor', 'thin', 'sucker', 'train', 'tie', 'hoe'])) return { category: 'labor', confidence: 'keyword' };
+  if (has(label, ['prun', 'hand', 'labor', 'thin', 'sucker', 'train', 'tie', 'hoe', 'girdl', 'pull ', 'attach'])) return { category: 'labor', confidence: 'keyword' };
   if (has(label, SEEDS)) return { category: 'otherMaterials', confidence: 'keyword', part: 'seeds' };
+  if (has(label, [...OTHER_MATERIALS, 'install', 'share rent', 'rent'])) return { category: 'otherMaterials', confidence: 'keyword' };
   return { category: 'otherMaterials', confidence: 'fallback' };
 }
 

@@ -3,8 +3,9 @@ import type { Category, CategoryMapping, RepriceSettings, RepricedCell, Repriced
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
 import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
+import { crf } from './crf';
 
-export const DEFAULT_SETTINGS: RepriceSettings = { targetPeriod: '', referenceMonth: 6, interestRate: null, overrides: {}, mapping: DEFAULT_MAPPING };
+export const DEFAULT_SETTINGS: RepriceSettings = { targetPeriod: '', referenceMonth: 6, interestRate: null, capitalRecoveryRate: null, overrides: {}, mapping: DEFAULT_MAPPING };
 
 /** Prefer the establishment table's stated price over the production assumptions. Never invent a missing price. */
 export function studySalePrice(study: ParsedStudy | null): number | null {
@@ -26,6 +27,63 @@ export const establishmentSource = (total: NonNullable<EstablishmentSummary['tot
 export const NO_ESTABLISHMENT_NOTE = 'This study prints no establishment cost we could find; establishment is not included.';
 const ESTABLISHMENT_CPI_NOTE = 'Establishment cost without a usable establishment table is repriced with the CPI (BLS CPI-U, all items), following the professor\'s rule.';
 const hasUsableTable = (study: ParsedStudy) => !!(study.establishment?.table?.years.length && study.establishment.table.rows.length);
+const pct = (rate: number) => `${Number((rate * 100).toFixed(3))}%`;
+export const NOT_REPRODUCED_NOTE = 'Establishment yearly charge: the study\'s printed charge could not be reproduced from its stated rate and years, so it is adjusted by the CPI instead.';
+
+/** The repriced establishment cost the yearly charge is recalculated from, and the same figure in study dollars. */
+interface EstablishmentBasis { original: number; repriced: number; words: string }
+/** The UC capital recovery inputs, ready to recalculate the yearly establishment charge, insurance and taxes. */
+interface EstablishmentRecalc { basis: EstablishmentBasis; rate: number; years: number; lenderRate: boolean }
+
+/** Tier 1: the accumulated net cash cost at the study's amortization year, from the repriced establishment table.
+ *  Tier 2: the repriced printed establishment total (including any lender edit). Null when neither is available. */
+function establishmentBasis(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor, totalRow: RepricedRow | null): EstablishmentBasis | null {
+  const est = study.establishment?.table;
+  if (est && hasUsableTable(study)) {
+    const by = establishmentSummaryOf(study).basisYear;
+    if (!by || by.index < 0 || by.index >= est.years.length) return null;
+    const i = est.rows.findIndex(r => r.kind === 'accumulated' && /CASH/i.test(r.label));
+    if (i < 0) return null;
+    const t = establishmentLayout(study, est, { ...settings, layout: 'establishment' }, ref, target, F);
+    const cell = t.rows.find(r => r.id === `e-${i}`)?.cells[`y${by.index + 1}`];
+    if (cell?.original == null || cell.repriced == null) return null;
+    return { original: cell.original, repriced: cell.repriced, words: `repriced establishment cost (year ${by.index + 1})` };
+  }
+  const c = totalRow?.cells.total;
+  if (c?.original == null || c.repriced == null) return null;
+  return { original: c.original, repriced: c.repriced, words: 'repriced establishment cost (printed total)' };
+}
+
+function establishmentRecalc(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor, totalRow: RepricedRow | null): EstablishmentRecalc | null {
+  const cr = establishmentSummaryOf(study).capitalRecovery;
+  if (!cr?.reproduces || !(cr.years.value > 0)) return null;
+  const basis = establishmentBasis(study, settings, ref, target, F, totalRow);
+  if (!basis) return null;
+  const lenderRate = settings.capitalRecoveryRate != null && Number.isFinite(settings.capitalRecoveryRate);
+  return { basis, rate: lenderRate ? settings.capitalRecoveryRate! : cr.ratePct.value / 100, years: cr.years.value, lenderRate };
+}
+
+/** The yearly establishment charge the UC way: basis x CRF(rate, years), salvage 0. */
+function recalculatedCharge(r: EstablishmentRecalc): { value: number; note: string } {
+  const basis = Math.max(0, r.basis.repriced);
+  const value = basis * crf(r.rate, r.years);
+  const clamp = r.basis.repriced < 0 ? ` The ${r.basis.words} is below zero, so it counts as $0.` : '';
+  return { value, note: `Recalculated: ${dollars(basis)} ${r.basis.words} x CRF(${pct(r.rate)}${r.lenderRate ? ', lender rate' : ''}, ${r.years} years) = ${dollars(value)}.${clamp}` };
+}
+
+/** Insurance or property tax on the establishment investment: rate x average investment (basis / 2, salvage 0), or the
+ *  study's per-acre amount scaled by the change in the basis when the rate is missing or does not reproduce it. */
+function recalculatedInvestmentCharge(r: EstablishmentRecalc, share: number, ratePct: number | null, what: string): { value: number; note: string } | null {
+  const basis = Math.max(0, r.basis.repriced);
+  const byRate = ratePct != null ? ratePct / 100 * r.basis.original / 2 : null;
+  if (ratePct != null && byRate != null && Math.abs(byRate - share) <= Math.max(1, share * 0.02)) {
+    const value = ratePct / 100 * basis / 2;
+    return { value, note: `Recalculated: ${pct(ratePct / 100)} ${what} rate x ${dollars(basis)} ${r.basis.words} / 2 average investment = ${dollars(value)}.` };
+  }
+  if (!(r.basis.original > 0)) return null;
+  const value = share * basis / r.basis.original;
+  return { value, note: `Recalculated: ${dollars(share)} study ${what} on establishment x (${dollars(basis)} ${r.basis.words} / ${dollars(r.basis.original)} in the study) = ${dollars(value)}.` };
+}
 
 const SECTION_LABEL: Record<OperationRow['category'], string> = { cultural: 'Cultural', harvest: 'Harvest', assessment: 'Assessment', postharvest: 'Postharvest', other: 'Other' };
 const round = (n: number | null) => (n == null ? null : Math.round(n));
@@ -181,20 +239,78 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const totalOperating: RepricedRow = { id: 'total-operating', label: 'TOTAL OPERATING COSTS/ACRE', kind: 'total', section: 'Operating', timeHrs: null, cells: Object.fromEntries(PROD_COLUMNS.map(c => [c.key, c.key === 'total' ? plainCell(opOrig + (interestRow?.cells.total.original ?? 0), opRep + (interestRow?.cells.total.repriced ?? 0)) : sumCells(opRows, c.key)])), page: study.costsPerAcre.operatingTotal?.page ?? null, quote: study.costsPerAcre.operatingTotal?.quote ?? null };
   rows.push(totalOperating);
 
+  // The professor's rule: establishment is repriced with the CPI, not the machinery index. When the study's capital
+  // recovery inputs reproduce its printed yearly charge, that charge and the insurance and taxes on the establishment
+  // investment are recalculated from the repriced establishment cost instead.
+  const estCls: CellClass = { category: 'establishmentCpi', confidence: 'column' };
+  const estSummary = establishmentSummaryOf(study);
+  const charge = estSummary.annualCharge;
+  const notes: string[] = [];
+  const estTotal = estSummary.total;
+  let estTotalRow: RepricedRow | null = null;
+  if (estTotal && !hasUsableTable(study)) {
+    estTotalRow = {
+      id: 'establishment-total', label: 'Establishment cost per acre, accumulated (CPI)', kind: 'overheadItem', section: 'Establishment', timeHrs: null,
+      cells: { total: { ...cellFrom(estTotal.value, estCls, F(estCls)), note: 'One-time investment, not added to the yearly total cost.' } },
+      page: estTotal.page, quote: estTotal.quote,
+    };
+    applyOverride(estTotalRow, 'total', settings);
+  }
+  const recalc = establishmentRecalc(study, settings, ref, target, F, estTotalRow);
+  if (estSummary.capitalRecovery && !estSummary.capitalRecovery.reproduces) notes.push(NOT_REPRODUCED_NOTE);
+  /** A row whose value is recalculated rather than indexed. The study's printed figure stays as the original; lender edits still apply. */
+  const recalcRow = (row: RepricedRow, original: number, calc: { value: number; note: string }) => {
+    row.cells = { total: { ...plainCell(original, calc.value), note: calc.note, recalculated: true } };
+    row.sourceNote = calc.note;
+    applyOverride(row, 'total', settings);
+    notes.push(`${row.label}: ${calc.note}`);
+    return row;
+  };
+
   // Cash overhead items.
   rows.push({ id: 'h-cash', label: 'CASH OVERHEAD', kind: 'heading', section: 'Cash overhead', timeHrs: null, cells: {}, page: null, quote: null });
-  const ohRows: RepricedRow[] = study.costsPerAcre.cashOverheadItems.map((it, i) => {
-    const cls: CellClass = { category: 'cashOverhead', confidence: 'column' };
-    const row: RepricedRow = { id: `oh-${i}`, label: it.description, kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(it.value, cls, F(cls)) }, page: it.page, quote: it.quote };
-    applyOverride(row, 'total', settings); return row;
+  const ohCls: CellClass = { category: 'cashOverhead', confidence: 'column' };
+  const items = study.costsPerAcre.cashOverheadItems;
+  const ic = recalc ? estSummary.investmentCharges : null;
+  // Property insurance and property taxes lines aggregate every investment; the establishment share is split out of each.
+  const pickLine = (test: (d: string) => boolean) => {
+    const matches = items.map((it, i) => ({ it, i })).filter(x => test(x.it.description));
+    return (matches.find(x => /property/i.test(x.it.description)) ?? matches[0])?.i ?? -1;
+  };
+  const shares = ic ? ([
+    { what: 'insurance', label: 'Property insurance', share: ic.insurance, ratePct: ic.insuranceRatePct, line: pickLine(d => /insurance/i.test(d) && !/liability|crop|worker|health|auto|vehicle|umbrella/i.test(d)) },
+    { what: 'property tax', label: 'Property taxes', share: ic.taxes, ratePct: ic.taxRatePct, line: pickLine(d => /\btax/i.test(d) && !/payroll|income|sales/i.test(d)) },
+  ]).filter(x => x.share > 0) : [];
+  const estShareRow = (id: string, label: string, x: typeof shares[number]): RepricedRow | null => {
+    const calc = recalculatedInvestmentCharge(recalc!, x.share, x.ratePct, x.what);
+    if (!calc) return null;
+    return recalcRow({ id, label, kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: {}, page: ic!.page, quote: ic!.quote }, x.share, calc);
+  };
+  const ohRows: RepricedRow[] = items.flatMap((it, i) => {
+    const x = shares.find(s => s.line === i && it.value >= s.share - 0.5);
+    const rest = x ? it.value - x.share : it.value;
+    const row: RepricedRow = { id: `oh-${i}`, label: x ? `${it.description}, other investments` : it.description, kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(rest, ohCls, F(ohCls)) }, page: it.page, quote: it.quote };
+    if (x) row.sourceNote = `The study's ${dollars(it.value)} less the establishment share of ${dollars(x.share)}, repriced with the CPI.`;
+    applyOverride(row, 'total', settings);
+    const est = x ? estShareRow(`oh-${i}-establishment`, `${it.description}, establishment share`, x) : null;
+    if (x && !est) { row.label = it.description; row.sourceNote = null; row.cells = { total: cellFrom(it.value, ohCls, F(ohCls)) }; applyOverride(row, 'total', settings); }
+    if (est) x!.line = -2; // handled
+    return est ? [row, est] : [row];
   });
-  rows.push(...ohRows);
   const cashOhOrig = study.costsPerAcre.cashOverheadTotal?.value ?? ohRows.reduce((s, r) => s + (r.cells.total.original ?? 0), 0);
-  const itemsOrig = ohRows.reduce((s, r) => s + (r.cells.total.original ?? 0), 0);
+  let itemsOrig = ohRows.reduce((s, r) => s + (r.cells.total.original ?? 0), 0);
+  // No matching overhead line: the establishment shares become their own rows only when the printed total still reconciles.
+  const unmatched = shares.filter(x => x.line !== -2);
+  if (unmatched.length) {
+    const need = unmatched.reduce((s, x) => s + x.share, 0);
+    const fits = cashOhOrig - itemsOrig >= need - 0.5 && unmatched.every(x => recalculatedInvestmentCharge(recalc!, x.share, x.ratePct, x.what));
+    if (fits) { unmatched.forEach((x, k) => ohRows.push(estShareRow(`oh-establishment-${k}`, `${x.label} on establishment`, x)!)); itemsOrig += need; }
+    else notes.push(`The study's ${unmatched.map(x => `${x.what} on the establishment investment (${dollars(x.share)} per acre)`).join(' and ')}, page ${ic!.page}, could not be matched to a cash overhead line without changing the printed cash overhead total, so ${unmatched.length > 1 ? 'they are' : 'it is'} not recalculated.`);
+  }
+  rows.push(...ohRows);
   // If the printed total exceeds the parsed items, the remainder is carried as an unparsed line so totals still match the study.
   if (cashOhOrig - itemsOrig > 1) {
-    const cls: CellClass = { category: 'cashOverhead', confidence: 'column' };
-    const row: RepricedRow = { id: 'oh-rest', label: 'Other cash overhead (not itemized in the parsed table)', kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(cashOhOrig - itemsOrig, cls, F(cls)) }, page: null, quote: null };
+    const row: RepricedRow = { id: 'oh-rest', label: 'Other cash overhead (not itemized in the parsed table)', kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(cashOhOrig - itemsOrig, ohCls, F(ohCls)) }, page: null, quote: null };
     applyOverride(row, 'total', settings); ohRows.push(row); rows.push(row);
   }
   const totalCashOh: RepricedRow = { id: 'total-cash-oh', label: 'TOTAL CASH OVERHEAD COSTS', kind: 'subtotal', section: 'Cash overhead', timeHrs: null, cells: { total: sumCells(ohRows, 'total') }, page: null, quote: null };
@@ -206,24 +322,22 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const ncItems = (study.costsPerAcre as { nonCashOverheadItems?: { description: string; value: number; page: number; quote: string }[] }).nonCashOverheadItems;
   const ncRows: RepricedRow[] = [];
   const ncCls: CellClass = { category: 'nonCashOverhead', confidence: 'column' };
-  // The professor's rule: establishment is repriced with the CPI, not the machinery index, so its yearly charge is split out of non-cash overhead.
-  const estCls: CellClass = { category: 'establishmentCpi', confidence: 'column' };
-  const estSummary = establishmentSummaryOf(study);
-  const charge = estSummary.annualCharge;
-  const notes: string[] = [];
   const ncRow = (id: string, label: string, value: number, cls: CellClass, page: number | null, quote: string | null): RepricedRow => {
     const row: RepricedRow = { id, label, kind: 'overheadItem', section: 'Non-cash overhead', timeHrs: null, cells: { total: cellFrom(value, cls, F(cls)) }, page, quote };
-    applyOverride(row, 'total', settings); ncRows.push(row); return row;
+    if (cls === estCls && recalc) recalcRow(row, value, recalculatedCharge(recalc));
+    else applyOverride(row, 'total', settings);
+    ncRows.push(row); return row;
   };
+  const chargeHow = recalc ? 'is recalculated from the repriced establishment cost with the study\'s capital recovery factor' : 'is repriced with the CPI (BLS CPI-U, all items)';
   if (ncItems && ncItems.length) {
     ncItems.forEach((it, i) => ncRow(`nc-${i}`, it.description, it.value, /establish/i.test(it.description) ? estCls : ncCls, it.page, it.quote));
-    if (ncItems.some(it => /establish/i.test(it.description))) notes.push('The establishment line in non-cash overhead is repriced with the CPI (BLS CPI-U, all items); the other non-cash overhead lines use the machinery index.');
+    if (ncItems.some(it => /establish/i.test(it.description))) notes.push(`The establishment line in non-cash overhead ${chargeHow}; the other non-cash overhead lines use the machinery index.`);
   } else if (study.costsPerAcre.nonCashOverheadTotal) {
     const t = study.costsPerAcre.nonCashOverheadTotal;
     if (charge && charge.value > 0 && charge.value < t.value) {
       ncRow('nc-0', 'Capital recovery, insurance and taxes on equipment and other investments (printed total less the establishment charge)', t.value - charge.value, ncCls, t.page, t.quote);
-      ncRow('nc-establishment', 'Establishment cost, yearly charge (CPI)', charge.value, estCls, charge.page, charge.quote);
-      notes.push(`The study's non-cash overhead total of ${dollars(t.value)} (page ${t.page}) includes a yearly establishment charge of ${dollars(charge.value)} (page ${charge.page}). That charge is repriced with the CPI (BLS CPI-U, all items); the remaining ${dollars(t.value - charge.value)} uses the machinery index.`);
+      ncRow('nc-establishment', recalc ? 'Establishment cost, yearly charge (recalculated)' : 'Establishment cost, yearly charge (CPI)', charge.value, estCls, charge.page, charge.quote);
+      notes.push(`The study's non-cash overhead total of ${dollars(t.value)} (page ${t.page}) includes a yearly establishment charge of ${dollars(charge.value)} (page ${charge.page}). That charge ${chargeHow}; the remaining ${dollars(t.value - charge.value)} uses the machinery index.`);
     } else {
       ncRow('nc-0', 'Capital recovery, insurance and taxes on equipment and investments (printed total)', t.value, ncCls, t.page, t.quote);
       if (charge) notes.push(`The study's yearly establishment charge of ${dollars(charge.value)} (page ${charge.page}) could not be separated from the non-cash overhead total, so the whole total uses the machinery index.`);
@@ -253,18 +367,11 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
 
   // Establishment cost when the study prints a figure but no usable table (tier 2): repriced by CPI, shown apart, never added to the yearly totals.
   let establishmentNote: string | null = null;
-  const estTotal = estSummary.total;
-  if (estTotal && !hasUsableTable(study)) {
+  if (estTotal && estTotalRow) {
     const yearly = charge ? ' The yearly establishment charge in non-cash overhead already is.' : '';
     rows.push({ id: 'h-establishment', label: 'ESTABLISHMENT COST (ONE-TIME INVESTMENT)', kind: 'heading', section: 'Establishment', timeHrs: null, cells: {}, page: null, quote: null });
-    const row: RepricedRow = {
-      id: 'establishment-total', label: 'Establishment cost per acre, accumulated (CPI)', kind: 'overheadItem', section: 'Establishment', timeHrs: null,
-      cells: { total: { ...cellFrom(estTotal.value, estCls, F(estCls)), note: 'One-time investment, not added to the yearly total cost.' } },
-      page: estTotal.page, quote: estTotal.quote,
-      sourceNote: `${establishmentSource(estTotal)[0].toUpperCase()}${establishmentSource(estTotal).slice(1)}. One-time investment, not added to the yearly total cost.${yearly}`,
-    };
-    applyOverride(row, 'total', settings);
-    rows.push(row);
+    estTotalRow.sourceNote = `${establishmentSource(estTotal)[0].toUpperCase()}${establishmentSource(estTotal).slice(1)}. One-time investment, not added to the yearly total cost.${yearly}`;
+    rows.push(estTotalRow);
     establishmentNote = `Establishment cost: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}, repriced with the CPI. It is a one-time investment and is not added to the yearly total cost.${yearly}`;
     notes.push(ESTABLISHMENT_CPI_NOTE);
   } else if (!estTotal && estSummary.status === 'none' && estSummary.perennial && !hasUsableTable(study)) {

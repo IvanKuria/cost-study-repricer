@@ -70,12 +70,12 @@ export default function App() {
   };
 
   const settings: RepriceSettings | null = target ? {
-    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, overrides, mapping: DEFAULT_MAPPING,
+    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides, mapping: DEFAULT_MAPPING,
   } : null;
   const calculation = useMemo<{ table: RepricedTable | null; error: string | null }>(() => {
     if (!study || !settings || study.source.id !== hash.study) return { table: null, error: null };
     try { return { table: repriceStudy(study, settings, series), error: null }; } catch (e) { return { table: null, error: String(e) }; }
-  }, [study, series, settings?.targetPeriod, settings?.interestRate, overrides, factorOverrides, layout, price, hash.study]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [study, series, settings?.targetPeriod, settings?.interestRate, settings?.capitalRecoveryRate, overrides, factorOverrides, layout, price, hash.study]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const table = calculation.table;
   const usedSeries = new Set(table?.rows.flatMap(r => Object.values(r.cells).flatMap(c => c.seriesId?.split('+') ?? [])) ?? []);
@@ -85,6 +85,10 @@ export default function App() {
     study: pick, series: series.filter(s => s.id === RATE_SERIES || usedSeries.has(s.id)),
     interestRate: settings?.interestRate ?? null, interestSource: hash.rate === null ? rateSource : 'lender-entered rate', acres: hash.acres, mappingNotes: mappingNotes(DEFAULT_MAPPING, series),
   } : null;
+  // The capital recovery rate only matters where the yearly establishment charge is recalculated: the production table of a study whose inputs reproduce its printed charge.
+  const capitalRecovery = study?.establishmentSummary?.capitalRecovery;
+  const crRateDefault = table?.layout === 'production' && capitalRecovery?.reproduces ? capitalRecovery.ratePct.value / 100 : null;
+  const crRateSource = capitalRecovery ? `Study rate for the establishment charge, page ${capitalRecovery.ratePct.page}` : '';
   const dataDate = series.filter(s => s.frequency === 'monthly').map(s => s.lastPeriod).sort().reverse()[0] ?? null;
 
   if (new URLSearchParams(window.location.search).get('section') === 'sources' && table && meta) return <main className="mx-auto max-w-4xl p-5"><h1 className="text-2xl font-bold mb-4">Sources and calculations</h1><p className="mb-4">Adjustment factor = selected month’s index ÷ study-period index. Adjusted cost = study cost × factor. Automatic production totals combine the adjusted components.</p><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} /></main>;
@@ -104,9 +108,9 @@ export default function App() {
         <main className="mx-auto max-w-[1240px] px-5 py-6 space-y-6">
           <Card className="p-5">
             <Controls
-              value={{ crop: hash.crop, study: hash.study, target, rate: hash.rate, acres: hash.acres }}
+              value={{ crop: hash.crop, study: hash.study, target, rate: hash.rate, crRate: hash.crRate, acres: hash.acres }}
               onChange={v => setHash({ ...DEFAULT_HASH, ...v })}
-              picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource}
+              picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource} crRateDefault={crRateDefault} crRateSource={crRateSource}
               hasEdits={Object.keys(overrides).length > 0 || Object.keys(factorOverrides).length > 0 || price !== null} onResetEdits={() => { setOverrides({}); setFactorOverrides({}); setPrice(null); }}
             />
           </Card>

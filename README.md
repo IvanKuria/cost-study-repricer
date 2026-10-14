@@ -71,8 +71,8 @@ row totals), table grapes other materials and custom (his footnoted splits), wal
 For every commodity with two parsed studies at least five years apart in the same region, the older
 study is repriced to the newer study's reference period and compared per category with the newer
 study. This measures how much of the change between two studies is price and how much is practice,
-yield, scale or the study authors' choices. With the June reference convention, median absolute errors over 46 pairs are about 21 percent
-on the total, and 47 to 105 percent by category. Some pairs contain parser artifacts; these figures
+yield, scale or the study authors' choices. With the June reference convention, median absolute errors over 52 pairs are about 22 percent
+on the total, and 53 to 100 percent by category (re-run 2026-10-14 after the parser fixes). Some pairs contain parser artifacts; these figures
 are diagnostic, not evidence of predictive accuracy. A lender should treat a repriced study as a
 starting point for review, not a forecast.
 
@@ -92,9 +92,20 @@ from 2010 onward are selectable; older files remain available to the shared pars
 
 ## Establishment calculations and exports
 
-The shared parser now supplies 74 row-by-row establishment tables. Fourteen carry subtotal
+The shared parser now supplies 113 row-by-row establishment tables. Six carry subtotal
 reconciliation warnings; see each study's `parse.warnings`. The 2024 almond study's second-year
 cultural total is $183 above the sum of its printed rows. The original figures are preserved.
+
+Establishment cost in production years follows the UC method (professor's rule): the yearly charge is
+recalculated as the repriced accumulated net cash cost per acre in the year the study amortizes (year 3 in
+the 2020 avocado study) times CRF(study's long-term rate, remaining production years), salvage zero.
+Insurance and property tax on the establishment investment are recalculated from the same basis. A study is
+recalculated only when its own stated rate and years reproduce its printed charge (91 studies); otherwise the
+printed charge is indexed by the CPI and the notes say why. A lender can override the capital recovery rate.
+
+Row labels that match no specific index fall back to the CPI and are tagged. Extending the keyword lists for
+machine field work, sampling and advisor services, and assessments brought fallback rows from 766 of 8,288
+to 195, with the professor's hand-classified studies still within tolerance.
 
 Each subtotal is its printed value plus changes in its components. The original difference between
 printed totals and rounded/parsed components stays unindexed, and each affected cell documents it.

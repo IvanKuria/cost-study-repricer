@@ -1,7 +1,7 @@
 import { Button, Field, NumberInput, Select, MONTHS, periodLabel } from '@/ui';
 import type { StudyPick } from '@/lib/types';
 
-export interface ControlsValue { crop: string | null; study: string | null; target: string | null; rate: number | null; acres: number }
+export interface ControlsValue { crop: string | null; study: string | null; target: string | null; rate: number | null; crRate: number | null; acres: number }
 
 const title = (s: string) => s.replace(/[-–]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
@@ -10,22 +10,24 @@ export function studyLabel(s: StudyPick): string {
   return `${s.region || 'California'} ${s.year}, ${when}`;
 }
 
-export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, hasEdits, onResetEdits }: {
+export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, crRateDefault = null, crRateSource = '', hasEdits, onResetEdits }: {
   value: ControlsValue; onChange: (v: ControlsValue) => void; picks: StudyPick[]; periods: string[];
-  rateDefault: number | null; rateSource: string; hasEdits: boolean; onResetEdits: () => void;
+  rateDefault: number | null; rateSource: string; crRateDefault?: number | null; crRateSource?: string; hasEdits: boolean; onResetEdits: () => void;
 }) {
   const commodities = [...new Set(picks.map(p => p.commodity))].sort();
   const studies = picks.filter(p => p.commodity === value.crop).sort((a, b) => b.year - a.year || a.region.localeCompare(b.region));
   const rateShown = value.rate ?? rateDefault;
+  const showCr = crRateDefault !== null;
+  const crShown = value.crRate ?? crRateDefault;
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.1fr_1.6fr_1fr_1fr_0.7fr] items-start">
+    <div className={`grid gap-4 items-start ${showCr ? 'lg:grid-cols-[1.1fr_1.6fr_1fr_1fr_1fr_0.7fr]' : 'lg:grid-cols-[1.1fr_1.6fr_1fr_1fr_0.7fr]'}`}>
       <Field label="Crop">
-        <Select id="crop" value={value.crop ?? ''} placeholder="Choose a crop" onChange={crop => onChange({ ...value, crop, study: null })}
+        <Select id="crop" value={value.crop ?? ''} placeholder="Choose a crop" onChange={crop => onChange({ ...value, crop, study: null, crRate: null })}
           options={commodities.map(c => ({ value: c, label: title(c) }))} />
       </Field>
       <Field label="Study">
         <Select id="study" value={value.study ?? ''} placeholder={value.crop ? 'Choose a study' : 'Pick a crop first'} disabled={!value.crop}
-          onChange={study => onChange({ ...value, study })}
+          onChange={study => onChange({ ...value, study, crRate: null })}
           options={studies.map(s => ({ value: s.id, label: `${studyLabel(s)}${s.description ? `. ${s.description}` : ''}` }))} />
       </Field>
       <Field label="Target month">
@@ -37,12 +39,17 @@ export function Controls({ value, onChange, picks, periods, rateDefault, rateSou
         : <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, rate: null })}>Use the default rate</button>}>
         <NumberInput id="rate" value={rateShown === null ? null : Math.round(rateShown * 10000) / 100} step={0.01} suffix="%" onChange={n => onChange({ ...value, rate: n === null ? null : n / 100 })} />
       </Field>
+      {showCr && <Field label="Capital recovery rate" hint={value.crRate === null
+        ? <span>{crRateSource}. <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, crRate: crRateDefault })}>Edit</button></span>
+        : <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, crRate: null })}>Use the study rate</button>}>
+        <NumberInput id="cr-rate" value={crShown === null ? null : Math.round(crShown * 10000) / 100} step={0.01} suffix="%" onChange={n => onChange({ ...value, crRate: n === null ? null : n / 100 })} />
+      </Field>}
       <div className="flex items-start gap-2">
         <Field label="Acres" className="flex-1">
           <NumberInput id="acres" value={value.acres} step={0.1} onChange={n => onChange({ ...value, acres: n && n > 0 ? n : 1 })} />
         </Field>
       </div>
-      {hasEdits && <div className="lg:col-span-5"><Button variant="ghost" className="h-9 px-3 text-[14px]" onClick={onResetEdits}>Reset edits</Button></div>}
+      {hasEdits && <div className={showCr ? 'lg:col-span-6' : 'lg:col-span-5'}><Button variant="ghost" className="h-9 px-3 text-[14px]" onClick={onResetEdits}>Reset edits</Button></div>}
     </div>
   );
 }
