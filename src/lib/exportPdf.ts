@@ -1,5 +1,5 @@
 import type { RepricedTable } from './types';
-import { fallbackSentence, fmt, fmtHrs, periodText, repricingSentence, type ExportMeta } from './exportShared';
+import { fallbackSentence, fmt, fmtHrs, lineText, periodText, repricingSentence, returnLines, type ExportMeta } from './exportShared';
 
 /**
  * The study's table on a landscape letter page, laid out the way UC prints it: a title block,
@@ -39,8 +39,9 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     rowMeta.push({ kind: r.kind });
     if (r.kind === 'heading') { body.push([{ content: r.label, styles: { fontStyle: 'bold' } }, ...Array(head[0].length - 1).fill('')]); continue; }
     if (r.kind === 'blank') { body.push(Array(head[0].length).fill('')); continue; }
-    const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || r.kind === 'returns';
-    const label = caps ? r.label.toUpperCase() : `    ${r.label}${r.sourceNote ? `\n    ${r.sourceNote}` : ''}`;
+    const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
+    const line = r.returnLine ? `\n    ${lineText(r.returnLine.quantity.current, r.returnLine.unit, r.returnLine.price.current)}` : '';
+    const label = caps ? r.label.toUpperCase() : `    ${r.label}${line}${r.sourceNote ? `\n    ${r.sourceNote}` : ''}`;
     const cells = columns.map(c => fmt(r.cells[c.key]?.repriced) + (r.cells[c.key]?.overridden ? ' *' : ''));
     const hrs = timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs;
     body.push([label, ...(isProd ? [fmtHrs(hrs)] : []), ...cells].map((v, i) => ({ content: v, styles: { fontStyle: caps && i === 0 ? 'bold' : 'normal' } })));
@@ -69,6 +70,22 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     if (y + lines.length * (size + 2) > H - margin) { doc.addPage(); y = margin; }
     doc.text(lines, margin, y); y += lines.length * (size + 2) + 4;
   };
+  const lines = returnLines(table);
+  if (lines.length) {
+    if (y > H - 120) { doc.addPage(); y = margin; }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...ink);
+    doc.text('Return lines (not indexed). * marks a lender edit.', margin, y); y += 4;
+    const n = (v: number | null, digits = 0) => v == null ? '' : v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 4) });
+    autoTable(doc, {
+      startY: y, margin: { left: margin, right: margin, bottom: 48 }, theme: 'plain',
+      head: [['Line', 'Unit', 'Quantity (study)', 'Quantity (now)', 'Price (study)', 'Price (now)', 'Value (study)', 'Value (now)', 'Source']],
+      body: lines.map(l => [l.label + (l.note ? `\n${l.note}` : ''), l.unit, n(l.quantity[0]), n(l.quantity[1]) + (l.edited && l.quantity[0] !== l.quantity[1] ? ' *' : ''), n(l.price[0], 2), n(l.price[1], 2) + (l.edited && l.price[0] !== l.price[1] ? ' *' : ''), fmt(l.value[0]), fmt(l.value[1]) + (l.edited ? ' *' : ''), `${l.what}${l.page != null ? `, page ${l.page}` : ''}`]),
+      styles: { font: 'helvetica', fontSize: 7.5, cellPadding: { top: 1.6, bottom: 1.6, left: 3, right: 3 }, textColor: ink, overflow: 'linebreak' },
+      headStyles: { fontStyle: 'normal', textColor: grey, lineWidth: { bottom: 0.5 }, lineColor: ink },
+      columnStyles: { 0: { cellWidth: 190 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+  }
   if (table.establishmentNote) para(table.establishmentNote, 8, ink);
   if (options.includeDetails) {
   para(repricingSentence(table, meta) + ' * marks an edited value.');

@@ -15,6 +15,57 @@ export function studySalePrice(study: ParsedStudy | null): number | null {
   return value != null && Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** Return line edits live in `settings.overrides` as `ret-<index>:price`, `ret-<index>:quantity` and `ret-<index>:total`. */
+export const returnKey = (index: number, field: 'price' | 'quantity' | 'total') => `ret-${index}:${field}`;
+/** True for override keys that edit gross returns in the production table (return lines, or the single gross row). */
+export const isReturnKey = (key: string) => /^ret-\d+:(price|quantity|total)$/.test(key) || key === 'gross:total' || key === 'gross';
+
+const UNIT_WORDS: [RegExp, string][] = [
+  [/^(lb|lbs|pound|pounds)$/, 'lb'], [/^(ton|tons)$/, 'ton'], [/^(box|boxes|bx)$/, 'box'], [/^(carton|cartons|ctn|ctns|crtn|crtns)$/, 'carton'],
+  [/^(tray|trays)$/, 'tray'], [/^(cwt|cwts)$/, 'cwt'], [/^(gal|gals|gallon|gallons)$/, 'gal'], [/^(bin|bins)$/, 'bin'], [/^(bale|bales)$/, 'bale'], [/^(bushel|bushels|bu)$/, 'bushel'],
+];
+const unitWord = (word: string | null | undefined) => {
+  const w = (word ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  return UNIT_WORDS.find(([re]) => re.test(w))?.[1] ?? null;
+};
+/** The unit the establishment table's yield row counts in, read from its label ("Meat Pounds Per Acre" is lb, "Cartons/Acre" is carton). */
+function yieldUnit(study: ParsedStudy): string | null {
+  const label = study.establishment?.table?.yieldRow?.label ?? '';
+  const before = label.match(/([A-Za-z]+)\s*(?:per|\/)\s*acre/i)?.[1];
+  // otherwise the last unit word is the counted thing: "28 Pound Boxes" counts boxes
+  return unitWord(before) ?? label.split(/[^A-Za-z]+/).map(unitWord).filter(Boolean).pop() ?? null;
+}
+
+/** The study's main crop line: the first return line whose unit matches the establishment yield unit; the first line when
+ *  there is no establishment yield to share with. -1 when the study prints no lines, or when the establishment yield is
+ *  counted in a unit no line uses (olive oil priced per gallon against a yield in tons): a price per gallon times tons is
+ *  meaningless, so the two views keep separate prices. */
+export function mainReturnIndex(study: ParsedStudy): number {
+  const lines = study.assumptions.returns ?? [];
+  if (!lines.length) return -1;
+  if (!study.establishment?.table?.yieldRow) return 0;
+  const unit = yieldUnit(study);
+  return unit ? lines.findIndex(l => unitWord(l.unit) === unit) : -1;
+}
+
+/** One sale price shared by the main crop line in the production table and the establishment years' income (yield x price).
+ *  The lender's edit of the main line's price wins; `pricePerUnit` is the same price set from the establishment view. Null when unedited. */
+export function sharedSalePrice(study: ParsedStudy, settings: Pick<RepriceSettings, 'overrides' | 'pricePerUnit'>): number | null {
+  const main = mainReturnIndex(study);
+  const edit = main >= 0 ? settings.overrides?.[returnKey(main, 'price')] : undefined;
+  const v = edit !== undefined ? edit : settings.pricePerUnit;
+  return v != null && Number.isFinite(v) ? v : null;
+}
+
+const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function sharedPriceNote(study: ParsedStudy, price: number): string {
+  const main = mainReturnIndex(study);
+  const line = study.assumptions.returns?.[main];
+  if (!line) return `Sale price: your price of ${money2(price)} per unit is used for income in the establishment years (each printed yield x price).`;
+  const units = unitWord(line.unit) && yieldUnit(study) && unitWord(line.unit) !== yieldUnit(study) ? ` The return line is priced per ${line.unit} and the establishment yield is counted in ${yieldUnit(study)}; check that the price fits both.` : '';
+  return `Shared sale price: your price of ${money2(price)} per ${line.unit} for "${line.name}" (study: ${money2(line.price)}) is used for that return line in mature production and for income in the establishment years (each printed yield x price). Income lowers the accumulated net cash cost, which is the basis of the recalculated yearly establishment charge.${units}`;
+}
+
 export interface Factor { seriesId: string | null; indexFrom: number | null; indexTo: number | null; factor: number | null; note: string | null }
 
 const NO_ESTABLISHMENT: EstablishmentSummary = { perennial: false, status: 'none', total: null, annualCharge: null, reason: null };
@@ -350,15 +401,66 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const totalRep = (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0) + (totalNc.cells.total.repriced ?? 0);
   rows.push({ id: 'total', label: 'TOTAL COSTS/ACRE', kind: 'total', section: 'Total', timeHrs: null, cells: { total: plainCell(totalOrig, totalRep) }, page: study.costsPerAcre.totalCost?.page ?? null, quote: study.costsPerAcre.totalCost?.quote ?? null });
 
-  // Returns are the study's and are never indexed; the lender changes them by override. A study that prints no
-  // per-acre gross returns still gets the row, empty, so a lender can type one in and see net returns.
+  // Returns are the study's and are never indexed; the lender changes them by override. When the study prints return
+  // lines (crop plus byproducts), each line is its own row and GROSS RETURNS/ACRE is their subtotal: the printed gross
+  // plus the change in the lines, so an unedited study shows exactly its printed figures. A study that prints no lines
+  // keeps the single editable gross row, empty when the study prints no per-acre gross returns.
   const gross = study.costsPerAcre.grossReturns;
-  const grossOrig = gross?.value ?? null;
-  const grossNote = grossOrig == null
-    ? 'The study prints no per-acre gross returns. Type a value to compute net returns.'
-    : 'Returns are not indexed. Type a value to update.';
-  const gr: RepricedRow = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'returns', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig), note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
-  applyOverride(gr, 'total', settings);
+  const lines = study.assumptions.returns ?? [];
+  let gr: RepricedRow;
+  let grossOrig: number | null;
+  if (lines.length) {
+    const main = mainReturnIndex(study);
+    const shared = sharedSalePrice(study, settings);
+    const lineRows = lines.map((l, i): RepricedRow => {
+      const id = `ret-${i}`;
+      const ov = (f: 'price' | 'quantity' | 'total') => { const v = settings.overrides[returnKey(i, f)]; return v !== undefined && Number.isFinite(v) ? v : undefined; };
+      const priceEdit = ov('price') ?? (i === main && shared != null ? shared : undefined);
+      const qtyEdit = ov('quantity');
+      const totalEdit = ov('total');
+      const q = qtyEdit ?? l.quantity ?? null, p = priceEdit ?? l.price ?? null;
+      const computed = l.quantity != null && l.price != null ? l.quantity * l.price : null;
+      const mismatch = computed != null && Math.abs(computed - l.value) > 1 ? computed - l.value : null;
+      const lineNotes: string[] = [];
+      if (mismatch != null) lineNotes.push(`The study prints ${dollars(l.value)} for this line; its quantity x price gives ${dollars(computed!)}. The printed value is kept until you change the price or quantity.`);
+      let value = l.value;
+      if (totalEdit !== undefined) { value = totalEdit; lineNotes.push('Your value replaces quantity x price for this line.'); }
+      else if ((priceEdit !== undefined || qtyEdit !== undefined) && q != null && p != null) { value = q * p; lineNotes.push(`${q.toLocaleString('en-US')} ${l.unit} x ${money2(p)} = ${dollars(value)}.`); }
+      if (i === main && shared != null && ov('price') === undefined && totalEdit === undefined) lineNotes.push('Uses the sale price you entered for the establishment years.');
+      const edited = totalEdit !== undefined || priceEdit !== undefined || qtyEdit !== undefined;
+      return {
+        id, label: l.name, kind: 'returns', section: 'Returns', timeHrs: null, page: l.page ?? null, quote: l.quote ?? null,
+        sourceNote: mismatch != null ? lineNotes[0] : null,
+        cells: { total: { ...plainCell(l.value, value), factor: null, overridden: edited, note: ['Returns are not indexed.', ...lineNotes].join(' ') } },
+        returnLine: {
+          unit: l.unit, main: i === main && !!study.establishment?.table?.yieldRow,
+          quantity: { original: l.quantity ?? null, current: totalEdit !== undefined ? l.quantity ?? null : q, edited: qtyEdit !== undefined && totalEdit === undefined },
+          price: { original: l.price ?? null, current: totalEdit !== undefined ? l.price ?? null : p, edited: priceEdit !== undefined && totalEdit === undefined },
+          valueEdited: totalEdit !== undefined, mismatch,
+        },
+      };
+    });
+    rows.push({ id: 'h-returns', label: 'GROSS RETURNS', kind: 'heading', section: 'Returns', timeHrs: null, cells: {}, page: null, quote: null });
+    rows.push(...lineRows);
+    const sumOrig = lines.reduce((s, l) => s + l.value, 0);
+    grossOrig = gross?.value ?? sumOrig;
+    const delta = lineRows.reduce((s, r) => s + (r.cells.total.repriced ?? 0) - (r.cells.total.original ?? 0), 0);
+    const residual = grossOrig - sumOrig;
+    const grossNote = ['Sum of the return lines. Returns are not indexed.', Math.abs(residual) > 0.5 ? `The printed gross returns differ from the sum of the lines by ${dollars(residual)}; that difference is kept.` : ''].filter(Boolean).join(' ');
+    gr = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'subtotal', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig + delta), factor: null, note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
+    // A 'gross:total' override (from an older link, made before return lines were shown) still replaces the subtotal,
+    // so the old link reproduces the same net returns. The lines keep their own values; the note says the subtotal is the lender's.
+    applyOverride(gr, 'total', settings);
+    if (gr.cells.total.overridden) gr.cells.total.note = 'Your gross returns figure replaces the sum of the return lines. Reset edits to use the lines again.';
+    if (shared != null && main >= 0 && study.establishment?.table?.yieldRow) notes.push(sharedPriceNote(study, shared));
+  } else {
+    grossOrig = gross?.value ?? null;
+    const grossNote = grossOrig == null
+      ? 'The study prints no per-acre gross returns. Type a value to compute net returns.'
+      : 'Returns are not indexed. Type a value to update.';
+    gr = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'returns', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig), note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
+    applyOverride(gr, 'total', settings);
+  }
   rows.push(gr);
   const g = gr.cells.total.repriced;
   const net = (cost: number | null | undefined, costRep: number | null | undefined) => plainCell(grossOrig == null ? null : grossOrig - (cost ?? 0), g == null ? null : g - (costRep ?? 0));
@@ -406,6 +508,9 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
     const delta = after - before;
     return plainCell(original, original === null && Math.abs(delta) < 1e-8 ? null : (original ?? 0) + delta);
   };
+  // One sale price for the establishment years and the main return line of the production table.
+  const salePrice = sharedSalePrice(study, settings);
+  if (salePrice != null && est.yieldRow) notes.add(sharedPriceNote(study, salePrice));
   let sectionDetails: RepricedRow[] = [];
   est.rows.forEach((r, i) => {
     const kind: RepricedRow['kind'] = r.kind === 'income' ? 'returns' : r.kind === 'accumulated' ? 'total' : r.kind;
@@ -441,7 +546,7 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
       } else if (kind === 'returns') {
         if (!incomeCells[c.key]) {
           const yieldValue = est.yieldRow?.values[k];
-          const rep = settings.pricePerUnit != null && yieldValue != null ? yieldValue * settings.pricePerUnit : original;
+          const rep = salePrice != null && yieldValue != null ? yieldValue * salePrice : original;
           incomeCells[c.key] = { ...plainCell(original, rep), note: est.yieldRow ? 'Returns are not indexed. Change the sale price per unit or type a value to update.' : 'Returns are not indexed. Type a value to update.' };
           const v = settings.overrides[`income:${c.key}`];
           if (v != null) incomeCells[c.key] = { ...incomeCells[c.key], repriced: v, overridden: true };
@@ -494,7 +599,7 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const totalRow = totals.get('total') ?? totals.get('cash');
   return {
     studyId: study.source.id, title: est.title, layout: 'establishment', columns: cols, rows,
-    referencePeriod: ref, targetPeriod: target, notes: [...notes], establishmentNote, yieldRow: est.yieldRow && { ...est.yieldRow, label: settings.pricePerUnit != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${settings.pricePerUnit.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
+    referencePeriod: ref, targetPeriod: target, notes: [...notes], establishmentNote, yieldRow: est.yieldRow && { ...est.yieldRow, label: salePrice != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${salePrice.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
     summary: summarize(details, totalRow?.cells[last.key]?.original ?? null, totalRow?.cells[last.key]?.repriced ?? null, totals.get('cash')?.cells[last.key]?.repriced ?? null),
   };
 }

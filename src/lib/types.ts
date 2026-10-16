@@ -64,6 +64,17 @@ export interface RepricedRow {
   page: number | null;
   quote: string | null;
   sourceNote?: string | null;     // plain-words source line shown under the label, e.g. where an establishment total was printed
+  returnLine?: ReturnLineDetail;  // a production return line (crop or byproduct): its printed and current quantity and price
+}
+
+/** A return line as the study prints it (quantity, unit, price) and as the lender has it now. The value is in `cells.total`. */
+export interface ReturnLineDetail {
+  unit: string;
+  main: boolean;                  // the main crop line of a study with an establishment yield row: its price is shared with the establishment years
+  quantity: { original: number | null; current: number | null; edited: boolean };
+  price: { original: number | null; current: number | null; edited: boolean };
+  valueEdited: boolean;           // the lender typed the value directly
+  mismatch: number | null;        // printed quantity x price less the printed value, when more than $1
 }
 
 export interface RepricedTable {

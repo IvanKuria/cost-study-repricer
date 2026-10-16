@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import type { ParsedStudy } from '../data/studySchema';
-import { repriceStudy, referencePeriod, DEFAULT_SETTINGS, NOT_REPRODUCED_NOTE, fallbackCount, usesFallback } from './reprice';
+import { repriceStudy, referencePeriod, DEFAULT_SETTINGS, NOT_REPRODUCED_NOTE, fallbackCount, usesFallback, mainReturnIndex } from './reprice';
 import { SERIES, latestPeriod, lookup, seriesById } from './series';
 
 const load = (id: string) => JSON.parse(readFileSync(`data/studies/parsed/${id}.json`, 'utf8')) as ParsedStudy;
@@ -124,7 +124,8 @@ describe('gross returns', () => {
   });
 
   it('keep a row when the study prints none, and a lender value computes the net returns', () => {
-    const none = { ...study, costsPerAcre: { ...study.costsPerAcre, grossReturns: null } } as ParsedStudy;
+    // A study that prints neither gross returns nor return lines.
+    const none = { ...study, assumptions: { ...study.assumptions, returns: [] }, costsPerAcre: { ...study.costsPerAcre, grossReturns: null } } as ParsedStudy;
     const empty = repriceStudy(none);
     expect(row(empty, 'gross').original).toBeNull();
     expect(row(empty, 'gross').repriced).toBeNull();
@@ -405,5 +406,149 @@ describe('recalculated yearly establishment charge', () => {
     expect(n.rows.some(r => /Property insurance on establishment/.test(r.label))).toBe(false);
     expect(n.notes!.join(' ')).toMatch(/insurance on the establishment investment \(\$10 per acre\), page 9, could not be matched/);
     expect(n.rows.find(r => r.label === 'Property Taxes, other investments')!.cells.total.original).toBe(230);
+  });
+});
+
+describe('crop specific return lines', () => {
+  const cell = (t: ReturnType<typeof repriceStudy>, id: string) => t.rows.find(r => r.id === id)!.cells.total;
+  const prod = { layout: 'production' as const, targetPeriod: '2026-06' };
+
+  it('every study with return lines reconciles: in study dollars the lines sum to the printed gross returns', () => {
+    let checked = 0;
+    for (const file of readdirSync('data/studies/parsed')) {
+      const s = load(file.replace('.json', ''));
+      const lines = s.assumptions.returns ?? [];
+      if (!lines.length) continue;
+      const t = repriceStudy(s, prod);
+      const rows = t.rows.filter(r => r.returnLine);
+      expect(rows.map(r => r.label), file).toEqual(lines.map(l => l.name));
+      rows.forEach((r, i) => {
+        expect(r.id).toBe(`ret-${i}`);
+        expect(r.cells.total.original, file).toBe(lines[i].value);
+        expect(r.cells.total.repriced, `${file}: unedited lines keep their printed value`).toBe(lines[i].value);
+        expect(r.page).toBe(lines[i].page);
+        expect(r.quote).toBe(lines[i].quote);
+      });
+      const printed = s.costsPerAcre.grossReturns!.value;
+      const sum = rows.reduce((a, r) => a + r.cells.total.original!, 0);
+      expect(Math.abs(sum - printed), file).toBeLessThanOrEqual(Math.max(2, printed * 0.01));
+      expect(cell(t, 'gross').original, file).toBe(printed);
+      expect(cell(t, 'gross').repriced, file).toBe(printed);
+      checked++;
+    }
+    expect(checked).toBe(196);
+  });
+
+  it('a price edit moves the line, the gross returns and both nets by quantity x the price change', () => {
+    const s = load(ALMOND);
+    s.establishment = null; // Without the establishment table the shared price cannot move the establishment charge.
+    s.establishmentSummary = undefined;
+    const base = repriceStudy(s, prod);
+    const line = s.assumptions.returns[0];
+    const t = repriceStudy(s, { ...prod, overrides: { 'ret-0:price': line.price + 0.5 } });
+    const delta = line.quantity * 0.5;
+    expect(cell(t, 'ret-0').repriced).toBeCloseTo(line.quantity * (line.price + 0.5), 8);
+    expect(cell(t, 'ret-0').overridden).toBe(true);
+    expect(cell(t, 'ret-0').original).toBe(line.value);
+    for (const id of ['gross', 'net-operating', 'net-total']) expect(cell(t, id).repriced! - cell(base, id).repriced!, id).toBeCloseTo(delta, 6);
+    expect(cell(t, 'total-operating').repriced).toBe(cell(base, 'total-operating').repriced);
+    const row = t.rows.find(r => r.id === 'ret-0')!;
+    expect(row.returnLine!.price).toEqual({ original: line.price, current: line.price + 0.5, edited: true });
+    // Typing the value directly replaces quantity x price.
+    const typed = repriceStudy(s, { ...prod, overrides: { 'ret-0:total': 5000 } });
+    expect(cell(typed, 'ret-0').repriced).toBe(5000);
+    expect(cell(typed, 'gross').repriced).toBe(cell(base, 'gross').repriced! + 5000 - line.value);
+  });
+
+  it('a multi-product study edits its lines independently (cotton lint and seed)', () => {
+    const s = load('cotton-cotton2012pima');
+    const [lint, seed] = s.assumptions.returns;
+    const base = repriceStudy(s, prod);
+    const t = repriceStudy(s, { ...prod, overrides: { 'ret-0:price': 1.5, 'ret-1:quantity': 4 } });
+    expect(cell(t, 'ret-0').repriced).toBeCloseTo(lint.quantity * 1.5, 8);
+    expect(cell(t, 'ret-1').repriced).toBeCloseTo(4 * seed.price, 8);
+    const delta = lint.quantity * 1.5 - lint.value + 4 * seed.price - seed.value;
+    expect(cell(t, 'gross').repriced! - cell(base, 'gross').repriced!).toBeCloseTo(delta, 6);
+    const onlySeed = repriceStudy(s, { ...prod, overrides: { 'ret-1:price': 50 } });
+    expect(cell(onlySeed, 'ret-0').repriced).toBe(lint.value);
+    expect(cell(onlySeed, 'ret-0').overridden).toBe(false);
+    expect(cell(onlySeed, 'ret-1').repriced).toBeCloseTo(seed.quantity * 50, 8);
+  });
+
+  it('a line whose printed value differs from quantity x price keeps the printed value, with a note, until edited', () => {
+    const s = load('avocados-2020avocadohighdensitysandiegocounty');
+    const line = s.assumptions.returns[0];
+    expect(Math.abs(line.quantity * line.price - line.value)).toBeGreaterThan(1);
+    const base = repriceStudy(s, prod);
+    const row = base.rows.find(r => r.id === 'ret-0')!;
+    expect(row.cells.total.repriced).toBe(line.value);
+    expect(row.returnLine!.mismatch).toBeCloseTo(line.quantity * line.price - line.value, 6);
+    expect(row.sourceNote).toMatch(/printed value is kept/);
+    const t = repriceStudy(s, { ...prod, overrides: { 'ret-0:price': line.price } });
+    expect(cell(t, 'ret-0').repriced).toBeCloseTo(line.quantity * line.price, 6);
+  });
+
+  it('the main crop price is shared with the establishment years, and moves the recalculated establishment charge', () => {
+    const s = load(ALMOND);
+    expect(mainReturnIndex(s)).toBe(0);
+    const price = s.assumptions.returns[0].price + 1;
+    const estBase = repriceStudy(s, { targetPeriod: '2026-06' });
+    const income = (t: ReturnType<typeof repriceStudy>) => t.rows.find(r => r.kind === 'returns')!;
+    const yields = s.establishment!.table!.yieldRow!.values;
+    // A production price edit reaches the establishment years' income ...
+    const estEdited = repriceStudy(s, { targetPeriod: '2026-06', overrides: { 'ret-0:price': price } });
+    const k = yields.findIndex(v => v != null && v > 0);
+    expect(income(estEdited).cells[`y${k + 1}`].repriced).toBeCloseTo(yields[k]! * price, 6);
+    expect(estEdited.notes!.some(n => /Shared sale price/.test(n))).toBe(true);
+    const acc = (t: ReturnType<typeof repriceStudy>) => t.rows.find(r => r.kind === 'total' && /ACCUMULATED NET CASH/i.test(r.label))!.cells.y3.repriced!;
+    const extraIncome = yields.slice(0, 3).reduce<number>((a, v, i) => a + (v ?? 0) * price - (income(estBase).cells[`y${i + 1}`].repriced ?? 0), 0);
+    expect(acc(estBase) - acc(estEdited)).toBeCloseTo(extraIncome, 6);
+    // ... and the establishment sale price reaches the production line (one shared price).
+    const prodByEst = repriceStudy(s, { ...prod, pricePerUnit: price });
+    expect(cell(prodByEst, 'ret-0').repriced).toBeCloseTo(s.assumptions.returns[0].quantity * price, 6);
+    // The capital recovery basis (accumulated net cash cost) falls by the extra income, and the yearly charge with it.
+    const pBase = repriceStudy(s, prod), pEdited = repriceStudy(s, { ...prod, overrides: { 'ret-0:price': price } });
+    const charge = (t: ReturnType<typeof repriceStudy>) => cell(t, 'nc-establishment');
+    expect(charge(pEdited).note).toContain(`$${Math.round(acc(estEdited)).toLocaleString('en-US')} repriced establishment cost (year 3)`);
+    expect(charge(pBase).repriced! - charge(pEdited).repriced!).toBeGreaterThan(0);
+    expect(charge(pEdited).repriced! / charge(pBase).repriced!).toBeCloseTo(acc(estEdited) / acc(estBase), 6);
+    expect(pEdited.notes!.some(n => /Shared sale price/.test(n))).toBe(true);
+  });
+
+  it('a gross returns override from an older link still replaces the subtotal of a study with lines', () => {
+    const s = load(ALMOND);
+    s.establishment = null;
+    s.establishmentSummary = undefined;
+    const base = repriceStudy(s, prod);
+    const t = repriceStudy(s, { ...prod, overrides: { 'gross:total': 9000, 'ret-0:price': 3 } });
+    expect(cell(t, 'gross').repriced).toBe(9000);
+    expect(cell(t, 'gross').overridden).toBe(true);
+    expect(cell(t, 'gross').note).toMatch(/replaces the sum of the return lines/);
+    expect(cell(t, 'net-total').repriced).toBeCloseTo(cell(base, 'net-total').repriced! + 9000 - cell(base, 'gross').repriced!, 6);
+  });
+
+  it('studies without return lines keep the single editable gross row as before', () => {
+    const s = load('almonds-2019almondssjvnorth');
+    expect(s.assumptions.returns ?? []).toHaveLength(0);
+    const t = repriceStudy(s, prod);
+    expect(t.rows.some(r => r.returnLine || r.id === 'h-returns')).toBe(false);
+    const gross = t.rows.find(r => r.id === 'gross')!;
+    expect(gross.kind).toBe('returns');
+    expect(gross.cells.total.repriced).toBe(s.costsPerAcre.grossReturns!.value);
+    expect(gross.cells.total.note).toBe('Returns are not indexed. Type a value to update.');
+    const edited = repriceStudy(s, { ...prod, overrides: { 'gross:total': 7000 } });
+    expect(cell(edited, 'gross').repriced).toBe(7000);
+    expect(cell(edited, 'net-total').repriced).toBeCloseTo(cell(t, 'net-total').repriced! + 7000 - s.costsPerAcre.grossReturns!.value, 6);
+    const none = load('spinach-2015-organicspinach-finaldraftjan29');
+    const empty = repriceStudy(none, prod);
+    expect(empty.rows.find(r => r.id === 'gross')!.kind).toBe('returns');
+    expect(cell(empty, 'gross').original).toBeNull();
+  });
+});
+
+describe('shared sale price only links lines counted in the establishment yield unit', () => {
+  it('links pomegranate boxes to "28 Pound Boxes" and keeps olive oil gallons apart from a yield in tons', () => {
+    expect(mainReturnIndex(load('pomegranates-pomegranatevs2010'))).toBe(0);
+    expect(mainReturnIndex(load('olive-oil-2016oliveoilsacvalley-highdensityfinaldraft7'))).toBe(-1);
   });
 });

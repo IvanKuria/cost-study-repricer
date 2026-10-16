@@ -1,5 +1,5 @@
 import type { RepricedTable } from './types';
-import { fallbackSentence, periodText, repricingSentence, type ExportMeta } from './exportShared';
+import { fallbackSentence, periodText, repricingSentence, returnLines, type ExportMeta } from './exportShared';
 
 /** One sheet with the study table (original, factor, and adjusted cost per column) and a Sources sheet. */
 export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Promise<Uint8Array> {
@@ -24,7 +24,7 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   }
   for (const r of table.rows) {
     if (r.kind === 'blank') { ws.addRow([]); continue; }
-    const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || r.kind === 'returns';
+    const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
     const label = r.displayLabel ?? r.label;
     const vals: (string | number | null)[] = [caps ? label.toUpperCase() : r.kind === 'heading' ? label : `  ${label}`];
     if (isProd) vals.push((timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs) ?? null);
@@ -52,6 +52,25 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   ws.addRow([repricingSentence(table, meta)]);
   ws.addRow([fallbackSentence(table)]);
   ws.getColumn(1).width = 44; for (let c = 2; c <= header.length; c++) ws.getColumn(c).width = 13;
+
+  const lines = returnLines(table);
+  if (lines.length) {
+    const rs = book.addWorksheet('Returns');
+    rs.addRow(['Return lines from the study. Returns are not indexed; edited cells are highlighted.']).font = { bold: true };
+    const head = rs.addRow(['Line', 'Unit', 'Quantity (study)', 'Quantity (now)', 'Price (study)', 'Price (now)', 'Value (study)', 'Value (now)', 'Edited', 'Page', 'Note']);
+    head.font = { bold: true }; head.eachCell(cell => { cell.border = { bottom: { style: 'thin' } }; });
+    for (const l of lines) {
+      const row = rs.addRow([l.label, l.unit, l.quantity[0], l.quantity[1], l.price[0], l.price[1], l.value[0], l.value[1], l.what, l.page, l.note]);
+      [3, 4].forEach(c => { row.getCell(c).numFmt = '#,##0.####'; });
+      [5, 6].forEach(c => { row.getCell(c).numFmt = '#,##0.00##'; });
+      [7, 8].forEach(c => { row.getCell(c).numFmt = '#,##0;[Red]-#,##0'; });
+      const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFF4CC' } };
+      if (l.quantity[0] !== l.quantity[1]) row.getCell(4).fill = yellow;
+      if (l.price[0] !== l.price[1]) row.getCell(6).fill = yellow;
+      if (l.edited) row.getCell(8).fill = yellow;
+    }
+    [36, 12, 14, 14, 12, 12, 13, 13, 30, 8, 60].forEach((w, i) => { rs.getColumn(i + 1).width = w; });
+  }
 
   const src = book.addWorksheet('Sources');
   src.addRow(['What', 'Source', 'Unit', 'Latest period', 'Link']).font = { bold: true };

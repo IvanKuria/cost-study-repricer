@@ -44,6 +44,24 @@ export function fallbackSentence(table: RepricedTable): string {
   return `${n} of ${m} priced rows use the CPI fallback because no specific index matched${n === 1 ? ' its label' : ' their labels'}.`;
 }
 
+export interface ReturnLineExport { label: string; unit: string; page: number | null; quantity: [number | null, number | null]; price: [number | null, number | null]; value: [number | null, number | null]; edited: boolean; what: string; note: string | null }
+
+/** The production table's return lines with the study's and the current quantity, price and value, and what the lender changed. */
+export function returnLines(table: RepricedTable): ReturnLineExport[] {
+  return table.rows.filter(r => r.returnLine).map(r => {
+    const d = r.returnLine!, c = r.cells.total;
+    const changed = [d.quantity.edited && 'quantity', d.price.edited && 'price', d.valueEdited && 'value'].filter(Boolean) as string[];
+    return {
+      label: r.label, unit: d.unit, page: r.page,
+      quantity: [d.quantity.original, d.quantity.current], price: [d.price.original, d.price.current], value: [c?.original ?? null, c?.repriced ?? null],
+      edited: !!c?.overridden, what: changed.length ? `Lender edit: ${changed.join(' and ')}` : c?.overridden ? 'Lender edit: shared sale price' : 'Study',
+      note: d.mismatch != null ? r.sourceNote ?? null : null,
+    };
+  });
+}
+/** "2,200 Lb at $1.60" for an export label. */
+export const lineText = (q: number | null, unit: string, p: number | null) => `${q == null ? '' : q.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${unit} at $${p == null ? '' : p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+
 export function hasOverrides(table: RepricedTable): boolean {
   return table.rows.some(r => Object.values(r.cells).some(c => c.overridden));
 }

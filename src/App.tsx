@@ -6,7 +6,7 @@ import { hasOverrides, type ExportMeta } from '@/lib/exportShared';
 import { DEFAULT_MAPPING } from '@/data/mapping';
 import { loadStudy, studyPicks } from '@/lib/studies';
 import { SERIES } from '@/lib/series';
-import { repriceStudy, studySalePrice } from '@/lib/reprice';
+import { isReturnKey, mainReturnIndex, repriceStudy, returnKey, studySalePrice } from '@/lib/reprice';
 import { Card, NumberInput, Field, periodLabel } from '@/ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Controls } from '@/screens/Controls';
@@ -64,18 +64,36 @@ export default function App() {
   const target = hash.target && periods.includes(hash.target) ? hash.target : periods[0] ?? null;
   const pick: StudyPick | null = picks.find(p => p.id === hash.study) ?? null;
   const defaultPrice = studySalePrice(study);
+  const returnEdits = hash.returns;
+  const setReturnEdits = (f: (r: Record<string, number>) => Record<string, number>) => setHash(h => ({ ...h, returns: f(h.returns) }));
+  // Studies with return lines share one sale price between the main return line and the establishment years: it is stored
+  // as that line's price edit. Studies without lines keep the establishment-only sale price.
+  const mainLine = study && study.source.id === hash.study ? mainReturnIndex(study) : -1;
+  const sharedKey = mainLine >= 0 ? returnKey(mainLine, 'price') : null;
+  const priceEdit = sharedKey ? returnEdits[sharedKey] ?? null : price;
   const changePrice = (value: number | null) => {
-    setPrice(value === defaultPrice ? null : value);
+    const next = value === defaultPrice ? null : value;
+    if (sharedKey) setReturnEdits(r => { const n = { ...r }; delete n[returnKey(mainLine, 'total')]; if (next === null) delete n[sharedKey]; else n[sharedKey] = next; return n; });
+    else setPrice(next);
     setOverrides(o => Object.fromEntries(Object.entries(o).filter(([key]) => !key.startsWith('income:'))));
   };
+  /** A return line edit: typing the value clears that line's price and quantity edits, and the other way round. */
+  const changeReturn = (key: string, value: number | null) => setReturnEdits(r => {
+    const n = { ...r };
+    const [id, field] = key.split(':');
+    if (field === 'total') { delete n[`${id}:price`]; delete n[`${id}:quantity`]; } else delete n[`${id}:total`];
+    if (value === null) delete n[key]; else n[key] = value;
+    return n;
+  });
+  const allOverrides = useMemo(() => ({ ...overrides, ...returnEdits }), [overrides, returnEdits]);
 
   const settings: RepriceSettings | null = target ? {
-    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides, mapping: DEFAULT_MAPPING,
+    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides: allOverrides, mapping: DEFAULT_MAPPING,
   } : null;
   const calculation = useMemo<{ table: RepricedTable | null; error: string | null }>(() => {
     if (!study || !settings || study.source.id !== hash.study) return { table: null, error: null };
     try { return { table: repriceStudy(study, settings, series), error: null }; } catch (e) { return { table: null, error: String(e) }; }
-  }, [study, series, settings?.targetPeriod, settings?.interestRate, settings?.capitalRecoveryRate, overrides, factorOverrides, layout, price, hash.study]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [study, series, settings?.targetPeriod, settings?.interestRate, settings?.capitalRecoveryRate, allOverrides, factorOverrides, layout, price, hash.study]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const table = calculation.table;
   const usedSeries = new Set(table?.rows.flatMap(r => Object.values(r.cells).flatMap(c => c.seriesId?.split('+') ?? [])) ?? []);
@@ -109,9 +127,9 @@ export default function App() {
           <Card className="p-5">
             <Controls
               value={{ crop: hash.crop, study: hash.study, target, rate: hash.rate, crRate: hash.crRate, acres: hash.acres }}
-              onChange={v => setHash({ ...DEFAULT_HASH, ...v })}
+              onChange={v => setHash(h => ({ ...DEFAULT_HASH, ...v, returns: v.study === h.study ? h.returns : {} }))}
               picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource} crRateDefault={crRateDefault} crRateSource={crRateSource}
-              hasEdits={Object.keys(overrides).length > 0 || Object.keys(factorOverrides).length > 0 || price !== null} onResetEdits={() => { setOverrides({}); setFactorOverrides({}); setPrice(null); }}
+              hasEdits={Object.keys(overrides).length > 0 || Object.keys(factorOverrides).length > 0 || price !== null || Object.keys(returnEdits).length > 0} onResetEdits={() => { setOverrides({}); setFactorOverrides({}); setPrice(null); setReturnEdits(() => ({})); }}
             />
           </Card>
           {(loadError || calculation.error) && <p role="alert" className="text-loss text-[14px]">{loadError || calculation.error}</p>}
@@ -123,7 +141,7 @@ export default function App() {
                   <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { setLayout(l); setOverrides({}); setFactorOverrides({}); }} className={`h-9 px-4 rounded-full border ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
                   <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}</p>
                 </div>
-                {table.layout === 'establishment' && table.yieldRow && <Field label="Sale price per unit" hint={<>{table.yieldRow.label}<br />{defaultPrice === null ? 'No unit price stated in the parsed study.' : price === null ? 'Using the study price.' : <button type="button" className="text-accent underline underline-offset-2" onClick={() => changePrice(null)}>Use study price (${defaultPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })})</button>}</>} className="max-w-sm"><NumberInput id="sale-price" value={price ?? defaultPrice} step={0.01} prefix="$" onChange={changePrice} /></Field>}
+                {table.layout === 'establishment' && table.yieldRow && <Field label="Sale price per unit" hint={<>{table.yieldRow.label}<br />{sharedKey && <>The same price is used for the main return line in mature production.<br /></>}{defaultPrice === null ? 'No unit price stated in the parsed study.' : priceEdit === null ? 'Using the study price.' : <button type="button" className="text-accent underline underline-offset-2" onClick={() => changePrice(null)}>Use study price (${defaultPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })})</button>}</>} className="max-w-sm"><NumberInput id="sale-price" value={priceEdit ?? defaultPrice} step={0.01} prefix="$" onChange={changePrice} /></Field>}
               </div>}
               <Card className="p-5"><Facts table={table} acres={hash.acres} /></Card>
               <Card className="p-5 space-y-4">
@@ -142,7 +160,7 @@ export default function App() {
                     setFactorOverrides(o => { const n = { ...o }; if (value === null) delete n[key]; else n[key] = value; if (table.layout === 'production' && !key.endsWith(':total')) delete n[`${key.split(':')[0]}:total`]; return n; });
                     setOverrides(o => { const n = { ...o }; delete n[key]; if (key.endsWith(':total')) delete n[key.slice(0, -6)]; else if (table.layout === 'production') { delete n[`${key.split(':')[0]}:total`]; delete n[key.split(':')[0]]; } return n; });
                   }}
-                  onOverride={(rowId, value) => { setFactorOverrides(o => { const n = { ...o }; delete n[rowId.includes(':') ? rowId : `${rowId}:total`]; return n; }); setOverrides(o => { const n = { ...o }; if (value === null) delete n[rowId]; else n[rowId] = value; return n; }); }} />
+                  onOverride={(rowId, value) => { if (isReturnKey(rowId)) { changeReturn(rowId === 'gross' ? 'gross:total' : rowId, value); return; } setFactorOverrides(o => { const n = { ...o }; delete n[rowId.includes(':') ? rowId : `${rowId}:total`]; return n; }); setOverrides(o => { const n = { ...o }; if (value === null) delete n[rowId]; else n[rowId] = value; return n; }); }} />
               </Card>
               <Card className="p-5"><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} /></Card>
               <Card className="p-5"><Exports table={table} meta={meta} /></Card>

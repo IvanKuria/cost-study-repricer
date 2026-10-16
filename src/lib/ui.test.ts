@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { repriceStudy } from './reprice';
 import { SERIES } from './series';
 import { studyPicks } from './studies';
-import { fallbackSentence, hasOverrides, peakCash, repricingSentence } from './exportShared';
+import { fallbackSentence, hasOverrides, peakCash, repricingSentence, returnLines } from './exportShared';
 import { buildPdf } from './exportPdf';
 import { buildWorkbook } from './exportXlsx';
 import type { ParsedStudy } from '@/data/studySchema';
 import type { RepricedCell, RepricedTable } from './types';
 import strawberries from '../../data/studies/parsed/strawberries-2024orgstrawberries-final-may2024.json';
+import cotton from '../../data/studies/parsed/cotton-cotton2012pima.json';
 
 const study = strawberries as unknown as ParsedStudy;
 const target = '2026-06';
@@ -103,5 +104,28 @@ describe('establishment in exports', () => {
     await b2.xlsx.load((await buildWorkbook(none, meta)).buffer as ArrayBuffer);
     const rows: string[] = []; b2.getWorksheet('Table')!.eachRow(r => rows.push(String(r.getCell(1).value ?? '')));
     expect(rows).toContain('This study prints no establishment cost we could find; establishment is not included.');
+  });
+});
+
+describe('return lines in exports', () => {
+  it('lists each line with the study and current quantity, price and value, and marks the lender edits', async () => {
+    const s = cotton as unknown as ParsedStudy;
+    const table = repriceStudy(s, { targetPeriod: target, overrides: { 'ret-1:price': 60 } }, SERIES);
+    const lines = returnLines(table);
+    expect(lines.map(l => l.label)).toEqual(s.assumptions.returns.map(r => r.name));
+    expect(lines[0]).toMatchObject({ edited: false, what: 'Study', quantity: [1500, 1500], price: [1.3, 1.3], value: [1950, 1950] });
+    expect(lines[1]).toMatchObject({ edited: true, what: 'Lender edit: price', quantity: [3, 3], price: [35, 60], value: [105, 180] });
+    const meta = { study: null, series: SERIES, interestRate: null, interestSource: '', acres: 1, mappingNotes: [] };
+    const { default: ExcelJS } = await import('exceljs');
+    const book = new ExcelJS.Workbook();
+    await book.xlsx.load((await buildWorkbook(table, meta)).buffer as ArrayBuffer);
+    const sheet = book.getWorksheet('Returns')!;
+    const rows: (string | number | null)[][] = [];
+    sheet.eachRow(r => rows.push((r.values as (string | number | null)[]).slice(1)));
+    const seed = rows.find(r => r[0] === 'Seed')!;
+    expect(seed.slice(2, 9)).toEqual([3, 3, 35, 60, 105, 180, 'Lender edit: price']);
+    const pdf = new TextDecoder().decode(await buildPdf(table, meta));
+    expect(pdf).toContain('Return lines');
+    expect(pdf).toContain('Lender edit: price');
   });
 });
