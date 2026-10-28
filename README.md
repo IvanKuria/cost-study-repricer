@@ -96,7 +96,7 @@ overhead and totals; establishment tables with one column per year when the pars
 
 ## Running and validating
 
-`npm run dev -- --host 127.0.0.1` serves the tool on port 5174, under `/cost-study-repricer/`.
+`npm run dev -- --host 127.0.0.1` serves the tool on port 5174. The live site is https://repricer.farmeconlab.org (GitHub Pages, custom domain).
 The initial screen loads the 2024 San Joaquin Valley South almond establishment table. Studies
 from 2010 onward are selectable; older files remain available to the shared parser.
 `npm test`, `npm run build`, and `npm run lint` validate the app.

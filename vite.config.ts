@@ -4,7 +4,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS === 'true' ? '/cost-study-repricer/' : '/',
+  base: '/',
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
   server: { port: 5174, open: false },
