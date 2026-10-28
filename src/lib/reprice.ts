@@ -227,7 +227,7 @@ export function repriceStudy(study: ParsedStudy, settingsIn: Partial<RepriceSett
   const F = (cls: CellClass) => factorFor(cls, ref.period, target, settings.mapping, series);
   const est = study.establishment?.table;
   const table = settings.layout !== 'production' && est && est.years.length && est.rows.length
-    ? establishmentLayout(study, est, settings, ref.period, target, F)
+    ? establishmentLayout(study, est, settings, ref.period, target, F, establishmentCharge(study, settings, ref.period, target, F))
     : productionLayout(study, settings, ref.period, target, F);
   return table;
 }
@@ -527,7 +527,18 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   };
 }
 
-function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): RepricedTable {
+interface EstablishmentCharge { value: number; note: string; after: number; studyValue: number }
+
+/** The recalculated yearly establishment charge for the establishment table's bearing years, from the same basis and
+ *  rate as the production table. Null when the study's charge cannot be recalculated. */
+function establishmentCharge(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): EstablishmentCharge | null {
+  const recalc = establishmentRecalc(study, settings, ref, target, F, null);
+  const { basisYear: by, capitalRecovery: cr } = establishmentSummaryOf(study);
+  if (!recalc || !by || !cr) return null;
+  return { ...recalculatedCharge(recalc), after: by.index, studyValue: Math.max(0, recalc.basis.original) * crf(cr.ratePct.value / 100, cr.years.value) };
+}
+
+function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor, charge: EstablishmentCharge | null = null): RepricedTable {
   const cols = est.years.map((label, i) => ({ key: `y${i + 1}`, label }));
   const rows: RepricedRow[] = [];
   const notes = new Set<string>([
@@ -576,7 +587,14 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
       const original = r.values[k] ?? null;
       if (kind === 'operation' || kind === 'overheadItem') {
         const cls = rowCategory(r.label, r.section);
-        row.cells[c.key] = cellFrom(original, cls, F(cls));
+        // The yearly establishment charge in the years after the amortized year is recalculated, as in the production table.
+        // It scales the printed charge by the recalculated charge over the same formula on the study's own figures, so
+        // an unchanged study keeps its printed (rounded) charge.
+        if (charge && charge.studyValue > 0 && k > charge.after && original != null && original > 0 && isNoncash(row) && /establish/i.test(r.label)) {
+          row.cells[c.key] = { ...plainCell(original, original * charge.value / charge.studyValue), note: charge.note, recalculated: true };
+          row.sourceNote = charge.note;
+          notes.add(`${r.label}: ${charge.note}`);
+        } else row.cells[c.key] = cellFrom(original, cls, F(cls));
         applyOverride(row, c.key, settings);
       } else if (kind === 'interest') {
         const ops = details.filter(d => d.kind === 'operation');

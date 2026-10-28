@@ -67,10 +67,28 @@ describe('real establishment tables', () => {
       expect(cell(edited, label).repriced! - cell(base, label).repriced!).toBeCloseTo(delta, 7);
       expect(cell(edited, label, 'y2').repriced).toBe(cell(base, label, 'y2').repriced);
     }
-    for (const c of base.columns) for (const label of [labels.acc, labels.accTotal]) {
-      expect(cell(edited, label, c.key).repriced! - cell(base, label, c.key).repriced!).toBeCloseTo(delta, 7);
+    // The higher establishment cost also raises the recalculated yearly charge in the years after the amortized year.
+    const charge = (t: typeof base, col: string) => t.rows.find(r => /^Establishment Costs/.test(r.label))!.cells[col]?.repriced ?? 0;
+    let chargeDelta = 0;
+    for (const c of base.columns) {
+      chargeDelta += charge(edited, c.key) - charge(base, c.key);
+      expect(cell(edited, labels.acc, c.key).repriced! - cell(base, labels.acc, c.key).repriced!).toBeCloseTo(delta, 7);
+      expect(cell(edited, labels.accTotal, c.key).repriced! - cell(base, labels.accTotal, c.key).repriced!).toBeCloseTo(delta + chargeDelta, 7);
     }
+    expect(charge(edited, 'y4')).toBeGreaterThan(charge(base, 'y4'));
     expect(cell(edited, op.label).original).toBe(1600);
+  });
+
+  it('shows the recalculated yearly charge in the years after the amortized year, matching the production table', () => {
+    const settings = { targetPeriod: '2026-07', interestRate: 0.0751 };
+    const est = repriceStudy(almond, settings);
+    const prod = repriceStudy(almond, { ...settings, layout: 'production' as const });
+    const printed = almond.establishmentSummary!.annualCharge!.value, computed = almond.establishmentSummary!.capitalRecovery!.computed;
+    const charge = est.rows.find(r => /^Establishment Costs/.test(r.label))!;
+    const yearly = prod.rows.find(r => r.id === 'nc-establishment')!.cells.total.repriced!;
+    expect(charge.cells.y4.repriced).toBeCloseTo(yearly * printed / computed, 6);
+    expect(Math.abs(charge.cells.y4.repriced! - yearly)).toBeLessThan(1);
+    expect(charge.cells.y3.repriced ?? 0).toBe(0);
   });
 
   it('keeps both printed income rows synchronized and subtracts revenue from cash need', () => {
@@ -129,7 +147,7 @@ describe('real establishment tables', () => {
       for (const row of unchanged.rows) for (const c of Object.values(row.cells)) expect(c.repriced ?? 0, `${file}: ${row.label}`).toBeCloseTo(c.original ?? 0, 6);
       for (const r of t.rows) for (const c of Object.values(r.cells)) {
         expect(c.repriced === null || Number.isFinite(c.repriced), `${file}: ${r.label}`).toBe(true);
-        if ((s.source.year ?? 0) >= 2010 && ['operation', 'overheadItem'].includes(r.kind) && c.original != null) {
+        if ((s.source.year ?? 0) >= 2010 && ['operation', 'overheadItem'].includes(r.kind) && c.original != null && !c.recalculated) {
           expect(c.seriesId, `${file}: ${r.label} must have category or general-index coverage`).toBeTruthy();
           expect(c.repriced).not.toBeNull();
         }
