@@ -64,6 +64,17 @@ row totals), table grapes other materials and custom (his footnoted splits), wal
   `~/Downloads` (set `SERIES_DIR`) plus live Quick Stats pulls for machinery, repairs and seeds when
   `NASS_KEY` is set in the environment. The key is never written to disk. Series pulled on an earlier
   run are kept when the key is absent.
+- `src/data/cropPrices.json`: USDA NASS California prices received (marketing-year averages) for the
+  series named in `src/data/cropPriceMapping.ts`, built by `npm run ingest:prices` from a Quick Stats
+  bulk extract (`CROP_PRICES_TSV`) or the API (`NASS_KEY`). Following the professor, each return line's
+  price is the study price x (USDA's price in the latest marketing year before the target year / USDA's
+  price in the study's price year, or the nearest earlier year within 3 years). The ratio has no units,
+  so lines priced per carton, box or tray are adjusted too. A line keeps the study price when USDA has
+  no matching series or no year newer than the study's. Disclaimers mark where the statewide change may
+  not fit (wine grapes, organic, grades, one price for all cuttings).
+- Capital recovery for orchard establishment uses the interest rate in use (the KC Fed rate, or the
+  lender's) unless the lender enters a separate capital recovery rate; the study's rate is shown for
+  comparison.
 - `data/backtest.json`: output of `npm run backtest`.
 
 ## Back-test

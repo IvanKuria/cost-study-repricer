@@ -18,6 +18,30 @@ export interface Series {
   lastPeriod: string;             // latest 'YYYY-MM' present
 }
 
+/** A USDA NASS price received series for one crop in California: marketing-year averages. Values keyed 'YYYY'. */
+export interface CropPrice {
+  id: string;                     // the NASS short description, e.g. 'ALMONDS - PRICE RECEIVED, MEASURED IN $ / LB'
+  commodity: string;              // NASS commodity, e.g. 'ALMONDS'
+  unit: string;                   // NASS unit, e.g. '$ / LB' or '$ / TON, DRY BASIS'
+  source: string;
+  url: string;
+  values: Record<string, number>; // marketing year -> dollars per unit; withheld years are absent
+}
+
+/** The USDA price applied to one return line, in the line's unit. Only lb, cwt and ton convert; containers never do. */
+export interface PublishedPrice {
+  seriesId: string;
+  year: string;                   // marketing year of the latest USDA price
+  value: number;                  // USDA's latest price, dollars per NASS unit
+  per: string;                    // the NASS unit word: 'lb', 'cwt', 'ton'
+  studyYear: string;              // the marketing year the change is measured from: the study's price year, or the nearest earlier
+  studyYearPrice: number;         // USDA's price in studyYear, dollars per NASS unit
+  change: number;                 // value / studyYearPrice - 1
+  studyPrice: number;             // the study's price per unit of the line
+  price: number;                  // studyPrice x (1 + change): the adjusted price per unit of the line
+  disclaimers: string[];          // why the statewide change may not fit this study
+}
+
 /** Which series reprices which category. `fallback` is used when the primary is missing for a period. */
 export interface CategoryMapping { category: Category; seriesId: string; fallbackSeriesId?: string; note: string }
 
@@ -32,6 +56,8 @@ export interface RepriceSettings {
   capitalRecoveryRate?: number | null; // yearly rate for the establishment capital recovery charge; null keeps the study's own
   overrides: Record<string, number>; // lineId -> lender-typed 'your cost' value (per acre)
   mapping: CategoryMapping[];
+  /** USDA crop prices that replace the study's sale prices when newer. Absent: every return keeps the study price. */
+  cropPrices?: CropPrice[];
 }
 
 /** One cell of a UC table: the study's value and how it was repriced. */
@@ -75,10 +101,17 @@ export interface ReturnLineDetail {
   price: { original: number | null; current: number | null; edited: boolean };
   valueEdited: boolean;           // the lender typed the value directly
   mismatch: number | null;        // printed quantity x price less the printed value, when more than $1
+  published: PublishedPrice | null; // the USDA price in use when the lender has not edited the price
+  default: number | null;         // the price before any lender edit: the USDA price when one applies, else the study price
+  kept: string | null;            // why the study price is kept when USDA prices are on and none applies
 }
 
 export interface RepricedTable {
   notes?: string[];
+  /** USDA crop price series used for this table's income, for the sources list. */
+  priceSources?: { series: CropPrice; year: string; value: number }[];
+  /** The sale price before any lender edit (USDA when one applies, else the study's), for the establishment price field. */
+  defaultSalePrice?: { price: number; published: PublishedPrice | null } | null;
   establishmentNote?: string | null; // establishment status in plain words: its source, or that the study prints none
   yieldRow?: { label: string; values: (number | null)[] } | null;
   summaryColumn?: string;

@@ -6,8 +6,9 @@ import { hasOverrides, type ExportMeta } from '@/lib/exportShared';
 import { DEFAULT_MAPPING } from '@/data/mapping';
 import { loadStudy, studyPicks } from '@/lib/studies';
 import { SERIES } from '@/lib/series';
-import { isReturnKey, mainReturnIndex, repriceStudy, returnKey, studySalePrice } from '@/lib/reprice';
-import { Card, NumberInput, Field, periodLabel } from '@/ui';
+import { defaultSalePrice, isReturnKey, mainReturnIndex, repriceStudy, returnKey, studySalePrice } from '@/lib/reprice';
+import { CROP_PRICES } from '@/lib/cropPrices';
+import { Card, periodLabel } from '@/ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Controls } from '@/screens/Controls';
 import { Facts } from '@/screens/Facts';
@@ -63,7 +64,10 @@ export default function App() {
   const rateInfo = useMemo(() => latestRate(series), [series]);
   const target = hash.target && periods.includes(hash.target) ? hash.target : periods[0] ?? null;
   const pick: StudyPick | null = picks.find(p => p.id === hash.study) ?? null;
-  const defaultPrice = studySalePrice(study);
+  // The sale price before any edit: the study price adjusted by USDA's California price ratio when one applies, else the study's.
+  const saleDefault = target && study && study.source.id === hash.study ? defaultSalePrice(study, { cropPrices: CROP_PRICES }, target) : null;
+  const defaultPrice = saleDefault?.price ?? null;
+  const usdaSale = saleDefault?.published ?? null;
   const returnEdits = hash.returns;
   const setReturnEdits = (f: (r: Record<string, number>) => Record<string, number>) => setHash(h => ({ ...h, returns: f(h.returns) }));
   // Studies with return lines share one sale price between the main return line and the establishment years: it is stored
@@ -71,6 +75,8 @@ export default function App() {
   const mainLine = study && study.source.id === hash.study ? mainReturnIndex(study) : -1;
   const sharedKey = mainLine >= 0 ? returnKey(mainLine, 'price') : null;
   const priceEdit = sharedKey ? returnEdits[sharedKey] ?? null : price;
+  const studyPrice = mainLine >= 0 ? study?.assumptions.returns[mainLine]?.price ?? null : studySalePrice(study);
+  const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const changePrice = (value: number | null) => {
     const next = value === defaultPrice ? null : value;
     if (sharedKey) setReturnEdits(r => { const n = { ...r }; delete n[returnKey(mainLine, 'total')]; if (next === null) delete n[sharedKey]; else n[sharedKey] = next; return n; });
@@ -88,7 +94,7 @@ export default function App() {
   const allOverrides = useMemo(() => ({ ...overrides, ...returnEdits }), [overrides, returnEdits]);
 
   const settings: RepriceSettings | null = target ? {
-    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides: allOverrides, mapping: DEFAULT_MAPPING,
+    layout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides: allOverrides, mapping: DEFAULT_MAPPING, cropPrices: CROP_PRICES,
   } : null;
   const calculation = useMemo<{ table: RepricedTable | null; error: string | null }>(() => {
     if (!study || !settings || study.source.id !== hash.study) return { table: null, error: null };
@@ -105,8 +111,11 @@ export default function App() {
   } : null;
   // The capital recovery rate only matters where the yearly establishment charge is recalculated: the production table of a study whose inputs reproduce its printed charge.
   const capitalRecovery = study?.establishmentSummary?.capitalRecovery;
-  const crRateDefault = table?.layout === 'production' && capitalRecovery?.reproduces ? capitalRecovery.ratePct.value / 100 : null;
-  const crRateSource = capitalRecovery ? `Study rate for the establishment charge, page ${capitalRecovery.ratePct.page}` : '';
+  // Its default is the interest rate in use; the study's own rate is shown for comparison.
+  const crRateDefault = table?.layout === 'production' && capitalRecovery?.reproduces ? settings?.interestRate ?? capitalRecovery.ratePct.value / 100 : null;
+  const crRateSource = !capitalRecovery ? '' : settings?.interestRate != null
+    ? `Same as the interest rate above; the study used ${capitalRecovery.ratePct.value}% (page ${capitalRecovery.ratePct.page})`
+    : `Study rate for the establishment charge, page ${capitalRecovery.ratePct.page}`;
   const dataDate = series.filter(s => s.frequency === 'monthly').map(s => s.lastPeriod).sort().reverse()[0] ?? null;
 
   if (new URLSearchParams(window.location.search).get('section') === 'sources' && table && meta) return <main className="mx-auto max-w-4xl p-5"><h1 className="text-2xl font-bold mb-4">Sources and calculations</h1><p className="mb-4">Adjustment factor = selected month’s index ÷ study-period index. Adjusted cost = study cost × factor. Automatic production totals combine the adjusted components.</p><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} /></main>;
@@ -136,12 +145,9 @@ export default function App() {
           {!hash.study && <p className="text-ink-2">Pick a crop and a study. The study's cost table appears here, repriced to the target month, and every line can be edited.</p>}
           {table && meta && (
             <>
-              {study?.establishment?.table && <div className="flex flex-wrap items-end gap-4">
-                <div className="max-w-sm space-y-2">
-                  <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { setLayout(l); setOverrides({}); setFactorOverrides({}); }} className={`h-9 px-4 rounded-full border ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
-                  <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}</p>
-                </div>
-                {table.layout === 'establishment' && table.yieldRow && <Field label="Sale price per unit" hint={<>{table.yieldRow.label}<br />{sharedKey && <>The same price is used for the main return line in mature production.<br /></>}{defaultPrice === null ? 'No unit price stated in the parsed study.' : priceEdit === null ? 'Using the study price.' : <button type="button" className="text-accent underline underline-offset-2" onClick={() => changePrice(null)}>Use study price (${defaultPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })})</button>}</>} className="max-w-sm"><NumberInput id="sale-price" value={priceEdit ?? defaultPrice} step={0.01} prefix="$" onChange={changePrice} /></Field>}
+              {study?.establishment?.table && <div className="max-w-sm space-y-2">
+                <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { setLayout(l); setOverrides({}); setFactorOverrides({}); }} className={`h-9 px-4 rounded-full border ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
+                <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}</p>
               </div>}
               <Card className="p-5"><Facts table={table} acres={hash.acres} /></Card>
               <Card className="p-5 space-y-4">
@@ -156,6 +162,12 @@ export default function App() {
                   {hasOverrides(table) && <span className="ml-auto text-ink-2">Edited values are marked.</span>}
                 </div>
                 <StudyTable key={`${table.studyId}-${table.layout}`} table={table} study={pick} series={series} view={view}
+                  salePrice={table.layout === 'establishment' && table.yieldRow && defaultPrice !== null ? {
+                    value: priceEdit ?? defaultPrice, edited: priceEdit !== null, usda: usdaSale, studyPrice, shared: !!sharedKey,
+                    onChange: changePrice,
+                    reset: priceEdit !== null ? { label: `Use ${usdaSale ? 'USDA' : 'study'} price (${money2(defaultPrice)})`, value: null } : null,
+                    toStudy: usdaSale && studyPrice != null && priceEdit !== studyPrice ? { label: `Use study price (${money2(studyPrice)})`, value: studyPrice } : null,
+                  } : null}
                   onFactor={(key, value) => {
                     setFactorOverrides(o => { const n = { ...o }; if (value === null) delete n[key]; else n[key] = value; if (table.layout === 'production' && !key.endsWith(':total')) delete n[`${key.split(':')[0]}:total`]; return n; });
                     setOverrides(o => { const n = { ...o }; delete n[key]; if (key.endsWith(':total')) delete n[key.slice(0, -6)]; else if (table.layout === 'production') { delete n[`${key.split(':')[0]}:total`]; delete n[key.split(':')[0]]; } return n; });

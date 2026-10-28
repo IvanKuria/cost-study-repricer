@@ -1,5 +1,5 @@
 import type { RepricedTable } from './types';
-import { fallbackSentence, fmt, fmtHrs, lineText, periodText, repricingSentence, returnLines, type ExportMeta } from './exportShared';
+import { fallbackSentence, fmt, fmtHrs, lineText, periodText, priceSourceLines, repricingSentence, returnLines, type ExportMeta } from './exportShared';
 
 /**
  * The study's table on a landscape letter page, laid out the way UC prints it: a title block,
@@ -74,7 +74,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   if (lines.length) {
     if (y > H - 120) { doc.addPage(); y = margin; }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...ink);
-    doc.text('Return lines (not indexed). * marks a lender edit.', margin, y); y += 4;
+    doc.text('Return lines (not indexed). Source USDA: the study price times USDA\'s California price ratio, latest year over the study year. * marks a lender edit.', margin, y); y += 4;
     const n = (v: number | null, digits = 0) => v == null ? '' : v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 4) });
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin, bottom: 48 }, theme: 'plain',
@@ -93,6 +93,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   for (const note of table.notes ?? []) para(note);
   if (meta.study) para(`Source study: UC Davis, ${meta.study.title}, ${meta.study.region}, ${meta.study.year}. ${meta.study.url}`);
   for (const s of meta.series) para(`${s.name}: ${s.source} (${s.unit}), latest ${periodText(s.lastPeriod)}. ${s.url}`);
+  for (const p of priceSourceLines(table)) para(`${p.text} ${p.url}`);
   if (meta.mappingNotes.length) para('How each line was repriced: ' + meta.mappingNotes.map(m => `${m.label} by ${m.series} (${m.note})`).join('; ') + '.');
 
   }

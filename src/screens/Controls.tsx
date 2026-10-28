@@ -41,7 +41,7 @@ export function Controls({ value, onChange, picks, periods, rateDefault, rateSou
       </Field>
       {showCr && <Field label="Capital recovery rate" hint={value.crRate === null
         ? <span>{crRateSource}. <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, crRate: crRateDefault })}>Edit</button></span>
-        : <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, crRate: null })}>Use the study rate</button>}>
+        : <button type="button" className="text-accent underline underline-offset-2" onClick={() => onChange({ ...value, crRate: null })}>Use the default rate</button>}>
         <NumberInput id="cr-rate" value={crShown === null ? null : Math.round(crShown * 10000) / 100} step={0.01} suffix="%" onChange={n => onChange({ ...value, crRate: n === null ? null : n / 100 })} />
       </Field>}
       <div className="flex items-start gap-2">

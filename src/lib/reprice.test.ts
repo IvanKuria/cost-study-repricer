@@ -326,7 +326,7 @@ describe('recalculated yearly establishment charge', () => {
     const r = row(t, 'nc-establishment');
     expect(r.cells.total.repriced).toBeCloseTo(basis * crf(0.055, 30), 8);
     const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-    expect(r.sourceNote).toBe(`Recalculated: ${money(basis)} repriced establishment cost (year 3) x CRF(5.5%, 30 years) = ${money(basis * crf(0.055, 30))}.`);
+    expect(r.sourceNote).toBe(`Recalculated: ${money(basis)} repriced establishment cost (year 3) x CRF(5.5%, study rate, 30 years) = ${money(basis * crf(0.055, 30))}.`);
     expect(r.cells.total.note).toBe(r.sourceNote);
     expect(t.notes!.some(n => n.includes(r.sourceNote!))).toBe(true);
     // Income is not indexed, but a lender's income edit moves the basis.
@@ -358,6 +358,13 @@ describe('recalculated yearly establishment charge', () => {
     const taxEst = row(rated, `${lineId(rated, 'Property Taxes, other investments')}-establishment`);
     expect(taxEst.cells.total.repriced).toBeCloseTo(0.01 * basis.repriced! / 2, 8);
     expect(taxEst.sourceNote).toMatch(/^Recalculated: 1% property tax rate x \$[\d,]+ repriced establishment cost \(year 3\) \/ 2 average investment = \$\d+\.$/);
+  });
+
+  it('the interest rate in use replaces the study rate in the CRF; a lender capital recovery rate beats both', () => {
+    const charge = (o: object) => row(repriceStudy(tier1(), { ...prod, interestRate: 0.07, ...o }), 'nc-establishment');
+    expect(charge({}).cells.total.repriced).toBeCloseTo(charge({ capitalRecoveryRate: 0.07 }).cells.total.repriced!, 8);
+    expect(charge({}).sourceNote).toMatch(/CRF\(7%, interest rate in use, 30 years\)/);
+    expect(charge({ capitalRecoveryRate: 0.08 }).sourceNote).toMatch(/CRF\(8%, lender rate, 30 years\)/);
   });
 
   it('a lender capital recovery rate replaces the study rate in the CRF only', () => {
@@ -396,7 +403,7 @@ describe('recalculated yearly establishment charge', () => {
     expect(row(same, 'total').cells.total.original).toBe(repriceStudy({ ...s, establishmentSummary: { ...s.establishmentSummary!, capitalRecovery: null } }, { targetPeriod: '2024-06' }).rows.find(r => r.id === 'total')!.cells.total.original);
     const t = repriceStudy(s);
     expect(row(t, 'nc-establishment').cells.total.repriced).toBeCloseTo(row(t, 'establishment-total').cells.total.repriced! * crf(0.05, 25), 8);
-    expect(row(t, 'nc-establishment').sourceNote).toMatch(/repriced establishment cost \(printed total\) x CRF\(5%, 25 years\)/);
+    expect(row(t, 'nc-establishment').sourceNote).toMatch(/repriced establishment cost \(printed total\) x CRF\(5%, study rate, 25 years\)/);
     const edited = repriceStudy(s, { overrides: { 'establishment-total:total': 15000 } });
     expect(row(edited, 'nc-establishment').cells.total.repriced).toBeCloseTo(15000 * crf(0.05, 25), 8);
     // No property insurance line and no unitemized remainder: the shares are only noted.

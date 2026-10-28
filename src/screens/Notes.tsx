@@ -1,6 +1,6 @@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { CategoryMapping, RepricedTable, Series, StudyPick } from '@/lib/types';
-import { repricingSentence, type ExportMeta } from '@/lib/exportShared';
+import { priceSourceLines, repricingSentence, type ExportMeta } from '@/lib/exportShared';
 import { periodLabel } from '@/ui';
 
 export const CATEGORY_LABEL: Record<string, string> = {
@@ -44,6 +44,7 @@ export function Notes({ table, meta, study, mapping, series }: { table: Repriced
         <ul className="space-y-1 text-[13px] text-ink-2">
           {study && <li>Source study: UC Davis, {study.title}, {study.region}, {study.year}. <a className="text-accent underline underline-offset-2" href={study.url} target="_blank" rel="noreferrer">PDF</a></li>}
           {series.map(s => <li key={s.id}>{s.name}: {s.source}, {s.unit}, latest {periodLabel(s.lastPeriod)}.{s.url && <> <a className="text-accent underline underline-offset-2" href={s.url} target="_blank" rel="noreferrer">source</a></>}</li>)}
+          {priceSourceLines(table).map(t => <li key={t.text}>{t.text} <a className="text-accent underline underline-offset-2" href={t.url} target="_blank" rel="noreferrer">source</a></li>)}
         </ul>
       </div>
     </div>

@@ -11,6 +11,7 @@
     "test": "vitest run",
     "sync:studies": "tsx scripts/syncStudies.ts",
     "ingest:series": "tsx scripts/ingestSeries.ts",
+    "ingest:prices": "tsx scripts/ingestCropPrices.ts",
     "backtest": "tsx scripts/backtest.ts"
   },
   "dependencies": {

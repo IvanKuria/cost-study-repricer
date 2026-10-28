@@ -1,9 +1,10 @@
 import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, OperationRow, ParsedStudy } from '../data/studySchema';
-import type { Category, CategoryMapping, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
+import type { Category, CategoryMapping, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
 import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
 import { crf } from './crf';
+import { publishedNote, publishedPrice, unitWord, type PriceLookup } from './cropPrices';
 
 export const DEFAULT_SETTINGS: RepriceSettings = { targetPeriod: '', referenceMonth: 6, interestRate: null, capitalRecoveryRate: null, overrides: {}, mapping: DEFAULT_MAPPING };
 
@@ -20,14 +21,6 @@ export const returnKey = (index: number, field: 'price' | 'quantity' | 'total') 
 /** True for override keys that edit gross returns in the production table (return lines, or the single gross row). */
 export const isReturnKey = (key: string) => /^ret-\d+:(price|quantity|total)$/.test(key) || key === 'gross:total' || key === 'gross';
 
-const UNIT_WORDS: [RegExp, string][] = [
-  [/^(lb|lbs|pound|pounds)$/, 'lb'], [/^(ton|tons)$/, 'ton'], [/^(box|boxes|bx)$/, 'box'], [/^(carton|cartons|ctn|ctns|crtn|crtns)$/, 'carton'],
-  [/^(tray|trays)$/, 'tray'], [/^(cwt|cwts)$/, 'cwt'], [/^(gal|gals|gallon|gallons)$/, 'gal'], [/^(bin|bins)$/, 'bin'], [/^(bale|bales)$/, 'bale'], [/^(bushel|bushels|bu)$/, 'bushel'],
-];
-const unitWord = (word: string | null | undefined) => {
-  const w = (word ?? '').toLowerCase().replace(/[^a-z]/g, '');
-  return UNIT_WORDS.find(([re]) => re.test(w))?.[1] ?? null;
-};
 /** The unit the establishment table's yield row counts in, read from its label ("Meat Pounds Per Acre" is lb, "Cartons/Acre" is carton). */
 function yieldUnit(study: ParsedStudy): string | null {
   const label = study.establishment?.table?.yieldRow?.label ?? '';
@@ -57,7 +50,36 @@ export function sharedSalePrice(study: ParsedStudy, settings: Pick<RepriceSettin
   return v != null && Number.isFinite(v) ? v : null;
 }
 
+/** The line a commodity's general USDA rule prices: the main crop line, or the first line when the main line is unclear. */
+const pricingIndex = (study: ParsedStudy) => (study.assumptions.returns ?? []).length ? Math.max(0, mainReturnIndex(study)) : -1;
+
+/** The USDA price for the sale price shared with the establishment years: the main return line's, or, for a study
+ *  without return lines, the establishment yield's unit. Null when USDA prices are off or there is no line to price. */
+export function mainPublishedPrice(study: ParsedStudy, settings: Pick<RepriceSettings, 'cropPrices'>, target: string): PriceLookup | null {
+  if (!settings.cropPrices) return null;
+  const lines = study.assumptions.returns ?? [];
+  const main = mainReturnIndex(study);
+  if (main >= 0) return publishedPrice(study, lines[main], true, target, settings.cropPrices);
+  if (lines.length || !study.establishment?.table?.yieldRow) return null;
+  return publishedPrice(study, { name: study.source.commodity, unit: yieldUnit(study) ?? '', price: studySalePrice(study) }, true, target, settings.cropPrices);
+}
+
+/** The sale price before any lender edit: the USDA-adjusted price when one applies, else the study's. */
+export function defaultSalePrice(study: ParsedStudy | null, settings: Pick<RepriceSettings, 'cropPrices'>, target: string): { price: number; published: PublishedPrice | null } | null {
+  if (!study) return null;
+  const published = mainPublishedPrice(study, settings, target)?.published ?? null;
+  if (published) return { price: published.price, published };
+  const price = studySalePrice(study);
+  return price == null ? null : { price, published: null };
+}
+
 const money2 = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+/** The establishment sale price's USDA note: the study price, the USDA ratio, and the adjusted price. */
+function establishmentUsdaNote(study: ParsedStudy, p: PublishedPrice): string {
+  const line = study.assumptions.returns?.[mainReturnIndex(study)];
+  const text = publishedNote(p, line?.unit ?? yieldUnit(study) ?? 'unit');
+  return `Sale price for the establishment years and the main return line: ${text}${p.disclaimers.length ? ` ${p.disclaimers.join(' ')}` : ''} Income lowers the accumulated net cash cost, which is the basis of the recalculated yearly establishment charge.`;
+}
 function sharedPriceNote(study: ParsedStudy, price: number): string {
   const main = mainReturnIndex(study);
   const line = study.assumptions.returns?.[main];
@@ -84,7 +106,7 @@ export const NOT_REPRODUCED_NOTE = 'Establishment yearly charge: the study\'s pr
 /** The repriced establishment cost the yearly charge is recalculated from, and the same figure in study dollars. */
 interface EstablishmentBasis { original: number; repriced: number; words: string }
 /** The UC capital recovery inputs, ready to recalculate the yearly establishment charge, insurance and taxes. */
-interface EstablishmentRecalc { basis: EstablishmentBasis; rate: number; years: number; lenderRate: boolean }
+interface EstablishmentRecalc { basis: EstablishmentBasis; rate: number; years: number; rateSource: 'lender' | 'interest' | 'study' }
 
 /** Tier 1: the accumulated net cash cost at the study's amortization year, from the repriced establishment table.
  *  Tier 2: the repriced printed establishment total (including any lender edit). Null when neither is available. */
@@ -110,8 +132,11 @@ function establishmentRecalc(study: ParsedStudy, settings: RepriceSettings, ref:
   if (!cr?.reproduces || !(cr.years.value > 0)) return null;
   const basis = establishmentBasis(study, settings, ref, target, F, totalRow);
   if (!basis) return null;
-  const lenderRate = settings.capitalRecoveryRate != null && Number.isFinite(settings.capitalRecoveryRate);
-  return { basis, rate: lenderRate ? settings.capitalRecoveryRate! : cr.ratePct.value / 100, years: cr.years.value, lenderRate };
+  // The adopted rate: the lender's capital recovery rate, else the interest rate in use (the professor's rule), else the study's.
+  const ok = (r: number | null | undefined): r is number => r != null && Number.isFinite(r);
+  const rateSource = ok(settings.capitalRecoveryRate) ? 'lender' : ok(settings.interestRate) ? 'interest' : 'study';
+  const rate = rateSource === 'lender' ? settings.capitalRecoveryRate! : rateSource === 'interest' ? settings.interestRate! : cr.ratePct.value / 100;
+  return { basis, rate, years: cr.years.value, rateSource };
 }
 
 /** The yearly establishment charge the UC way: basis x CRF(rate, years), salvage 0. */
@@ -119,7 +144,7 @@ function recalculatedCharge(r: EstablishmentRecalc): { value: number; note: stri
   const basis = Math.max(0, r.basis.repriced);
   const value = basis * crf(r.rate, r.years);
   const clamp = r.basis.repriced < 0 ? ` The ${r.basis.words} is below zero, so it counts as $0.` : '';
-  return { value, note: `Recalculated: ${dollars(basis)} ${r.basis.words} x CRF(${pct(r.rate)}${r.lenderRate ? ', lender rate' : ''}, ${r.years} years) = ${dollars(value)}.${clamp}` };
+  return { value, note: `Recalculated: ${dollars(basis)} ${r.basis.words} x CRF(${pct(r.rate)}, ${r.rateSource === 'lender' ? 'lender rate' : r.rateSource === 'interest' ? 'interest rate in use' : 'study rate'}, ${r.years} years) = ${dollars(value)}.${clamp}` };
 }
 
 /** Insurance or property tax on the establishment investment: rate x average investment (basis / 2, salvage 0), or the
@@ -401,42 +426,55 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const totalRep = (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0) + (totalNc.cells.total.repriced ?? 0);
   rows.push({ id: 'total', label: 'TOTAL COSTS/ACRE', kind: 'total', section: 'Total', timeHrs: null, cells: { total: plainCell(totalOrig, totalRep) }, page: study.costsPerAcre.totalCost?.page ?? null, quote: study.costsPerAcre.totalCost?.quote ?? null });
 
-  // Returns are the study's and are never indexed; the lender changes them by override. When the study prints return
+  // Returns are never indexed by a cost series. When USDA prices are on, a line's price is the study price times USDA's
+  // California price ratio (latest year / study year)
+  // where one applies (see cropPrices.ts); the lender changes any line by override. When the study prints return
   // lines (crop plus byproducts), each line is its own row and GROSS RETURNS/ACRE is their subtotal: the printed gross
-  // plus the change in the lines, so an unedited study shows exactly its printed figures. A study that prints no lines
-  // keeps the single editable gross row, empty when the study prints no per-acre gross returns.
+  // plus the change in the lines, so an unedited study without USDA prices shows exactly its printed figures. A study
+  // that prints no lines keeps the single editable gross row, empty when the study prints no per-acre gross returns.
   const gross = study.costsPerAcre.grossReturns;
   const lines = study.assumptions.returns ?? [];
+  const priceSources: NonNullable<RepricedTable['priceSources']> = [];
   let gr: RepricedRow;
   let grossOrig: number | null;
   if (lines.length) {
     const main = mainReturnIndex(study);
     const shared = sharedSalePrice(study, settings);
+    const pricing = pricingIndex(study);
     const lineRows = lines.map((l, i): RepricedRow => {
       const id = `ret-${i}`;
       const ov = (f: 'price' | 'quantity' | 'total') => { const v = settings.overrides[returnKey(i, f)]; return v !== undefined && Number.isFinite(v) ? v : undefined; };
+      const usda = settings.cropPrices ? publishedPrice(study, l, i === pricing, target, settings.cropPrices) : null;
+      const pub = usda?.published ?? null;
       const priceEdit = ov('price') ?? (i === main && shared != null ? shared : undefined);
       const qtyEdit = ov('quantity');
       const totalEdit = ov('total');
-      const q = qtyEdit ?? l.quantity ?? null, p = priceEdit ?? l.price ?? null;
+      const usePub = pub != null && priceEdit === undefined && totalEdit === undefined;
+      const defaultPrice = pub?.price ?? l.price ?? null;
+      const q = qtyEdit ?? l.quantity ?? null, p = priceEdit ?? defaultPrice;
       const computed = l.quantity != null && l.price != null ? l.quantity * l.price : null;
       const mismatch = computed != null && Math.abs(computed - l.value) > 1 ? computed - l.value : null;
       const lineNotes: string[] = [];
-      if (mismatch != null) lineNotes.push(`The study prints ${dollars(l.value)} for this line; its quantity x price gives ${dollars(computed!)}. The printed value is kept until you change the price or quantity.`);
+      if (mismatch != null) lineNotes.push(`The study prints ${dollars(l.value)} for this line; its quantity x price gives ${dollars(computed!)}. ${usePub ? 'The printed value is adjusted by the USDA change.' : 'The printed value is kept until you change the price or quantity.'}`);
       let value = l.value;
       if (totalEdit !== undefined) { value = totalEdit; lineNotes.push('Your value replaces quantity x price for this line.'); }
       else if ((priceEdit !== undefined || qtyEdit !== undefined) && q != null && p != null) { value = q * p; lineNotes.push(`${q.toLocaleString('en-US')} ${l.unit} x ${money2(p)} = ${dollars(value)}.`); }
+      else if (usePub) { value = l.value * (1 + pub.change); lineNotes.push(`${dollars(l.value)} x ${(1 + pub.change).toFixed(4)} = ${dollars(value)}.`); }
       if (i === main && shared != null && ov('price') === undefined && totalEdit === undefined) lineNotes.push('Uses the sale price you entered for the establishment years.');
+      const priceNote = pub ? [publishedNote(pub, l.unit), ...pub.disclaimers].join(' ') : usda?.kept ? `Study price kept: ${usda.kept}` : null;
+      if (usePub && usda?.series) { priceSources.push({ series: usda.series, year: pub.year, value: pub.value }); notes.push(`Gross returns, "${l.name}": ${priceNote}`); }
+      else if (usda?.kept && i === pricing) notes.push(`Gross returns, "${l.name}": study price kept. ${usda.kept}`);
       const edited = totalEdit !== undefined || priceEdit !== undefined || qtyEdit !== undefined;
       return {
         id, label: l.name, kind: 'returns', section: 'Returns', timeHrs: null, page: l.page ?? null, quote: l.quote ?? null,
         sourceNote: mismatch != null ? lineNotes[0] : null,
-        cells: { total: { ...plainCell(l.value, value), factor: null, overridden: edited, note: ['Returns are not indexed.', ...lineNotes].join(' ') } },
+        cells: { total: { ...plainCell(l.value, value), factor: null, overridden: edited, note: [usePub ? null : 'Returns are not indexed.', priceNote, ...lineNotes].filter(Boolean).join(' ') } },
         returnLine: {
           unit: l.unit, main: i === main && !!study.establishment?.table?.yieldRow,
           quantity: { original: l.quantity ?? null, current: totalEdit !== undefined ? l.quantity ?? null : q, edited: qtyEdit !== undefined && totalEdit === undefined },
-          price: { original: l.price ?? null, current: totalEdit !== undefined ? l.price ?? null : p, edited: priceEdit !== undefined && totalEdit === undefined },
+          price: { original: l.price ?? null, current: totalEdit !== undefined ? defaultPrice : p, edited: priceEdit !== undefined && totalEdit === undefined },
           valueEdited: totalEdit !== undefined, mismatch,
+          published: pub, default: defaultPrice, kept: usda?.kept ?? null,
         },
       };
     });
@@ -446,7 +484,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     grossOrig = gross?.value ?? sumOrig;
     const delta = lineRows.reduce((s, r) => s + (r.cells.total.repriced ?? 0) - (r.cells.total.original ?? 0), 0);
     const residual = grossOrig - sumOrig;
-    const grossNote = ['Sum of the return lines. Returns are not indexed.', Math.abs(residual) > 0.5 ? `The printed gross returns differ from the sum of the lines by ${dollars(residual)}; that difference is kept.` : ''].filter(Boolean).join(' ');
+    const grossNote = [`Sum of the return lines.${priceSources.length ? '' : ' Returns are not indexed.'}`, Math.abs(residual) > 0.5 ? `The printed gross returns differ from the sum of the lines by ${dollars(residual)}; that difference is kept.` : ''].filter(Boolean).join(' ');
     gr = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'subtotal', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig + delta), factor: null, note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
     // A 'gross:total' override (from an older link, made before return lines were shown) still replaces the subtotal,
     // so the old link reproduces the same net returns. The lines keep their own values; the note says the subtotal is the lender's.
@@ -457,7 +495,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     grossOrig = gross?.value ?? null;
     const grossNote = grossOrig == null
       ? 'The study prints no per-acre gross returns. Type a value to compute net returns.'
-      : 'Returns are not indexed. Type a value to update.';
+      : `Returns are not indexed. Type a value to update.${settings.cropPrices ? ' The study prints no quantity and price for its returns, so no USDA price change can be applied.' : ''}`;
     gr = { id: 'gross', label: 'GROSS RETURNS/ACRE', kind: 'returns', section: 'Returns', timeHrs: null, cells: { total: { ...plainCell(grossOrig, grossOrig), note: grossNote } }, page: gross?.page ?? null, quote: gross?.quote ?? null };
     applyOverride(gr, 'total', settings);
   }
@@ -484,7 +522,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   return {
     studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production',
     columns: [{ key: 'timeHrs', label: 'Time (Hrs/A)' }, ...PROD_COLUMNS],
-    rows, referencePeriod: ref, targetPeriod: target, notes, establishmentNote,
+    rows, referencePeriod: ref, targetPeriod: target, notes, establishmentNote, priceSources, defaultSalePrice: defaultSalePrice(study, settings, target),
     summary: summarize(rows.filter(r => r.section !== 'Establishment'), totalOrig, totalRep, (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0)),
   };
 }
@@ -508,9 +546,19 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
     const delta = after - before;
     return plainCell(original, original === null && Math.abs(delta) < 1e-8 ? null : (original ?? 0) + delta);
   };
-  // One sale price for the establishment years and the main return line of the production table.
-  const salePrice = sharedSalePrice(study, settings);
-  if (salePrice != null && est.yieldRow) notes.add(sharedPriceNote(study, salePrice));
+  // One sale price for the establishment years and the main return line of the production table: the lender's, else
+  // the study price adjusted by the USDA price change when one applies, else each year's printed income.
+  const lenderPrice = sharedSalePrice(study, settings);
+  const mainUsda = lenderPrice == null && est.yieldRow ? mainPublishedPrice(study, settings, target) : null;
+  const usdaSale = mainUsda?.published ?? null;
+  const salePrice = lenderPrice ?? usdaSale?.price ?? null;
+  const priceSources: NonNullable<RepricedTable['priceSources']> = usdaSale && mainUsda?.series ? [{ series: mainUsda.series, year: usdaSale.year, value: usdaSale.value }] : [];
+  if (lenderPrice != null && est.yieldRow) notes.add(sharedPriceNote(study, lenderPrice));
+  else if (usdaSale) notes.add(establishmentUsdaNote(study, usdaSale));
+  else if (mainUsda?.kept) notes.add(`Sale price for the establishment years: the study's printed income is kept. ${mainUsda.kept}`);
+  const incomeNote = !est.yieldRow ? 'Returns are not indexed. Type a value to update.'
+    : usdaSale ? `Income is each printed yield x the study price adjusted by USDA's California price change (${money2(usdaSale.price)}, ${usdaSale.studyYear} to ${usdaSale.year}). Change the sale price per unit or type a value to update.`
+      : 'Returns are not indexed. Change the sale price per unit or type a value to update.';
   let sectionDetails: RepricedRow[] = [];
   est.rows.forEach((r, i) => {
     const kind: RepricedRow['kind'] = r.kind === 'income' ? 'returns' : r.kind === 'accumulated' ? 'total' : r.kind;
@@ -547,7 +595,7 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
         if (!incomeCells[c.key]) {
           const yieldValue = est.yieldRow?.values[k];
           const rep = salePrice != null && yieldValue != null ? yieldValue * salePrice : original;
-          incomeCells[c.key] = { ...plainCell(original, rep), note: est.yieldRow ? 'Returns are not indexed. Change the sale price per unit or type a value to update.' : 'Returns are not indexed. Type a value to update.' };
+          incomeCells[c.key] = { ...plainCell(original, rep), note: incomeNote };
           const v = settings.overrides[`income:${c.key}`];
           if (v != null) incomeCells[c.key] = { ...incomeCells[c.key], repriced: v, overridden: true };
         }
@@ -599,7 +647,7 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const totalRow = totals.get('total') ?? totals.get('cash');
   return {
     studyId: study.source.id, title: est.title, layout: 'establishment', columns: cols, rows,
-    referencePeriod: ref, targetPeriod: target, notes: [...notes], establishmentNote, yieldRow: est.yieldRow && { ...est.yieldRow, label: salePrice != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${salePrice.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
+    referencePeriod: ref, targetPeriod: target, notes: [...notes], establishmentNote, priceSources, defaultSalePrice: defaultSalePrice(study, settings, target), yieldRow: est.yieldRow && { ...est.yieldRow, label: salePrice != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${salePrice.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
     summary: summarize(details, totalRow?.cells[last.key]?.original ?? null, totalRow?.cells[last.key]?.repriced ?? null, totals.get('cash')?.cells[last.key]?.repriced ?? null),
   };
 }

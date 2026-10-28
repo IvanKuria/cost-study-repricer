@@ -56,7 +56,7 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   const lines = returnLines(table);
   if (lines.length) {
     const rs = book.addWorksheet('Returns');
-    rs.addRow(['Return lines from the study. Returns are not indexed; edited cells are highlighted.']).font = { bold: true };
+    rs.addRow(['Return lines from the study. Returns are not indexed; where the Edited column says USDA, the study price is multiplied by USDA\'s California price ratio, latest year over the study year. Edited cells are highlighted.']).font = { bold: true };
     const head = rs.addRow(['Line', 'Unit', 'Quantity (study)', 'Quantity (now)', 'Price (study)', 'Price (now)', 'Value (study)', 'Value (now)', 'Edited', 'Page', 'Note']);
     head.font = { bold: true }; head.eachCell(cell => { cell.border = { bottom: { style: 'thin' } }; });
     for (const l of lines) {
@@ -76,6 +76,8 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   src.addRow(['What', 'Source', 'Unit', 'Latest period', 'Link']).font = { bold: true };
   if (meta.study) src.addRow([`Source study: UC Davis, ${meta.study.title}`, `${meta.study.region}, ${meta.study.year}`, '', meta.study.priceYear ? `prices as of ${meta.study.priceYear}` : '', meta.study.url]);
   for (const s of meta.series) src.addRow([s.name, s.source, s.unit, periodText(s.lastPeriod), s.url]);
+  const listed = new Set<string>();
+  for (const p of table.priceSources ?? []) if (!listed.has(p.series.id)) { listed.add(p.series.id); src.addRow([p.series.id, p.series.source, p.series.unit, `${p.year} marketing year`, p.series.url]); }
   src.addRow([]);
   src.addRow(['Line category', 'Series', 'Note']).font = { bold: true };
   for (const m of meta.mappingNotes) src.addRow([m.label, m.series, m.note]);
