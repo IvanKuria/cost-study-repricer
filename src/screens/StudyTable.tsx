@@ -204,7 +204,7 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                     {r.returnLine && view !== 'study' && <PriceSource row={r} />}
                     {r.returnLine && r.page != null && <span className="block text-[11px] leading-snug text-ink-3">{study ? <a className="underline underline-offset-2" href={`${study.url}#page=${r.page}`} target="_blank" rel="noreferrer">Study, page {r.page}</a> : `Study, page ${r.page}`}{r.quote && `: "${r.quote}"`}</span>}
                     {r.kind === 'returns' && <span className="block text-[11px] leading-snug text-ink-2 normal-case">{returnsHint(r, isProd, view, !!table.yieldRow)}</span>}
-                    {r.id === 'gross' && r.kind === 'subtotal' && <span className="block text-[11px] leading-snug text-ink-2 normal-case font-normal">{r.cells.total?.overridden ? r.cells.total.note : 'Sum of the return lines above. Not indexed.'}</span>}
+                    {r.id === 'gross' && r.kind === 'subtotal' && <span className="block text-[11px] leading-snug text-ink-2 normal-case font-normal">{r.cells.total?.overridden ? r.cells.total.note : 'Sum of the return lines above.'}</span>}
                   </td>
                   {(showTime || hasTime) && <td className="py-[3px] px-2 text-right tnum">{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
                   {cols.map(c => {
@@ -249,11 +249,11 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
 }
 
 function returnsHint(row: RepricedRow, isProd: boolean, view: View, hasPrice: boolean): string {
-  if (row.returnLine) return view === 'study' ? 'Not indexed.' : `Not indexed${usesUsda(row.returnLine) ? '; USDA price' : ''}. Change the quantity or price, or type the value.`;
+  if (row.returnLine) return view === 'study' ? 'Not indexed.' : `${usesUsda(row.returnLine) ? 'Study price x USDA price change' : 'Not indexed'}. Change the quantity or price, or type the value.`;
   const missing = Object.values(row.cells).every(c => c.original == null);
   if (view === 'study') return isProd && missing ? 'The study prints no per-acre gross returns.' : 'Not indexed.';
   if (isProd) return missing ? 'The study prints no per-acre gross returns. Type one in to compute net returns.' : 'Not indexed. Type a value to update.';
-  return hasPrice ? 'Not indexed. Type a value in any year, or change the sale price per unit above.' : 'Not indexed. Type a value in any year to update.';
+  return hasPrice ? 'Each year\'s yield x the sale price per unit above. Type a value in any year, or change the price.' : 'Not indexed. Type a value in any year to update.';
 }
 
 function FactorInput({ cell, label, source, onChange }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void }) {
