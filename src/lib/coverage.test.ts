@@ -18,11 +18,6 @@ const CPI_ALLOWED: Record<string, string> = {
   'boysenberries-boysenberriesvn02': 'study error: the printed charge is about 1/15 of its own inputs',
   'pasture-pastureep-sv-2015': 'the printed charge implies a 4.75% rate the study never states',
   'lychee-lycheescc02': 'the printed charge implies a 6.5% rate the study never states',
-  'pasture-20pasturesnfhestabtillnotill': 'production cost table not parsed, so no row carries the charge',
-  'bermudagrass-hay-bermhay04': 'one-page format; production cost table not parsed',
-  'bermudagrass-seed-bermseed04': 'one-page format; production cost table not parsed',
-  'kleingrass-hay-kleingrass04': 'one-page format; production cost table not parsed',
-  'guava-guava-sc07': 'production cost tables not parsed (split text)',
 };
 
 /** Studies whose own tables disagree on the charge, so the reproduce and cross-table checks skip them. */

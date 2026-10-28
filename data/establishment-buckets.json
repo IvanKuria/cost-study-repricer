@@ -31,6 +31,8 @@
     "avocados-avocadoconventionalvsbslo2011",
     "avocados-avocadosdrorganic-reports2011",
     "avocados-avocadovsbsloorganicreport2011",
+    "bermudagrass-hay-bermhay04",
+    "bermudagrass-seed-bermseed04",
     "blackberries-2024blackberries-correctedfinal-april2024",
     "blackberries-blackberrycc2013",
     "blueberries-blueberryvs2009",
@@ -66,6 +68,8 @@
     "grapes-wine-grapewinevn2012",
     "grapes-wine-wine-grape-sn-2015",
     "grapes-wine-winegrapenc2012",
+    "guava-guava-sc07",
+    "kleingrass-hay-kleingrass04",
     "lemons-2020lemonsventuracounty",
     "lemons-lemons-vs-2015",
     "lemons-lemonvs10",
@@ -80,6 +84,7 @@
     "oranges-2021orangessjvsouth",
     "oranges-oranges-vs-2015",
     "orchardgrass-hay-16orchardgrass-intermountain-752016",
+    "pasture-20pasturesnfhestabtillnotill",
     "peaches-2017peachsvsjv-ecling-final-draft2",
     "peaches-2017peachsvsjv-lcling",
     "peaches-nectarines-2000peach",
@@ -241,13 +246,8 @@
     "winter-forage-winterforagevn2004"
   ],
   "cpi": [
-    "bermudagrass-hay-bermhay04",
-    "bermudagrass-seed-bermseed04",
     "boysenberries-boysenberriesvn02",
-    "guava-guava-sc07",
-    "kleingrass-hay-kleingrass04",
     "lychee-lycheescc02",
-    "pasture-20pasturesnfhestabtillnotill",
     "pasture-pastureep-sv-2015"
   ]
 }

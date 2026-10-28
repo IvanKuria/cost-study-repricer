@@ -277,6 +277,16 @@ function applyOverride(row: RepricedRow, col: string, settings: RepriceSettings)
   row.cells[col] = { ...row.cells[col], repriced: v, overridden: true, factorOverridden: false, factor: cell.original ? v / cell.original : null };
 }
 
+const COST_COLS = ['labor', 'fuelLubeRepairs', 'materials', 'custom'] as const;
+/** A row's repriced total, anchored on its printed total: the printed cells are rounded (and now and then a study's row total
+ *  disagrees with its own cells), so the cells' repriced sum is scaled by printed total / printed cells. Every factor at 1
+ *  gives the printed total back. A row with no cells keeps its total unrepriced. */
+function rowTotal(origTotal: number, cells: Record<string, RepricedCell>): number {
+  const orig = COST_COLS.reduce((s, k) => s + (cells[k].original ?? 0), 0);
+  const rep = COST_COLS.reduce((s, k) => s + (cells[k].repriced ?? 0), 0);
+  return orig !== 0 ? origTotal * rep / orig : origTotal;
+}
+
 function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): RepricedTable {
   const rows: RepricedRow[] = [];
   const ops = study.costsPerAcre.operations;
@@ -299,13 +309,12 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
       materials: cellFrom(o.materials, c.materials, o.materials ? F(c.materials) : null),
       custom: cellFrom(o.customRent, c.customRent, o.customRent ? F(c.customRent) : null),
     };
-    const origTotal = o.totalCost ?? ['labor', 'fuelLubeRepairs', 'materials', 'custom'].reduce((s, k) => s + (cells[k].original ?? 0), 0);
-    const repTotal = ['labor', 'fuelLubeRepairs', 'materials', 'custom'].reduce((s, k) => s + (cells[k].repriced ?? 0), 0);
-    cells.total = plainCell(origTotal, repTotal);
+    const origTotal = o.totalCost ?? COST_COLS.reduce((s, k) => s + (cells[k].original ?? 0), 0);
+    cells.total = plainCell(origTotal, rowTotal(origTotal, cells));
     const row: RepricedRow = { id: `op-${i}`, label: o.name, kind: 'operation', section: SECTION_LABEL[o.category], timeHrs: o.timeHrsPerAcre, cells, page: o.page, quote: o.quote };
     for (const col of Object.keys(cells)) applyOverride(row, col, settings);
-    if (row.cells.total.overridden === false && ['labor', 'fuelLubeRepairs', 'materials', 'custom'].some(k => row.cells[k].overridden)) {
-      const repriced = ['labor', 'fuelLubeRepairs', 'materials', 'custom'].reduce((s, k) => s + (row.cells[k].repriced ?? 0), 0);
+    if (row.cells.total.overridden === false && COST_COLS.some(k => row.cells[k].overridden)) {
+      const repriced = rowTotal(origTotal, row.cells);
       row.cells.total = { ...row.cells.total, repriced, factor: origTotal ? repriced / origTotal : null };
     }
     opRows.push(row);
@@ -416,9 +425,12 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     else notes.push(`The study's ${unmatched.map(x => `${x.what} on the establishment investment (${dollars(x.share)} per acre)`).join(' and ')}, page ${ic!.page}, could not be matched to a cash overhead line without changing the printed cash overhead total, so ${unmatched.length > 1 ? 'they are' : 'it is'} not recalculated.`);
   }
   rows.push(...ohRows);
-  // If the printed total exceeds the parsed items, the remainder is carried as an unparsed line so totals still match the study.
-  if (cashOhOrig - itemsOrig > 1) {
-    const row: RepricedRow = { id: 'oh-rest', label: 'Other cash overhead (not itemized in the parsed table)', kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(cashOhOrig - itemsOrig, ohCls, F(ohCls)) }, page: null, quote: null };
+  // If the printed total differs from the parsed items, the remainder is carried as its own line so totals still match the
+  // study: a rounding difference when it is within half a dollar per item, else cash overhead the parsed table does not itemize.
+  const rest = cashOhOrig - itemsOrig;
+  if (rest > 1 || (Math.abs(rest) >= 0.5 && Math.abs(rest) <= 0.5 * Math.max(1, items.length))) {
+    const rounding = Math.abs(rest) <= 0.5 * Math.max(1, items.length);
+    const row: RepricedRow = { id: 'oh-rest', label: rounding ? 'Rounding difference between the itemized and the printed cash overhead' : 'Other cash overhead (not itemized in the parsed table)', kind: 'overheadItem', section: 'Cash overhead', timeHrs: null, cells: { total: cellFrom(rest, ohCls, F(ohCls)) }, page: null, quote: null };
     applyOverride(row, 'total', settings); ohRows.push(row); rows.push(row);
   }
   const totalCashOh: RepricedRow = { id: 'total-cash-oh', label: 'TOTAL CASH OVERHEAD COSTS', kind: 'subtotal', section: 'Cash overhead', timeHrs: null, cells: { total: sumCells(ohRows, 'total') }, page: null, quote: null };
@@ -442,7 +454,11 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     if (ncItems.some(it => /establish/i.test(it.description))) notes.push(`The establishment line in non-cash overhead ${chargeHow}; the other non-cash overhead lines use the machinery index.`);
   } else if (study.costsPerAcre.nonCashOverheadTotal) {
     const t = study.costsPerAcre.nonCashOverheadTotal;
-    if (charge && charge.value > 0 && charge.value < t.value) {
+    if (charge && charge.value > 0 && Math.abs(charge.value - t.value) <= 0.5) {
+      // the establishment charge is the whole non-cash overhead (one investment, or the one-page budgets' amortization line)
+      ncRow('nc-establishment', recalc ? 'Establishment cost, yearly charge (recalculated)' : 'Establishment cost, yearly charge (CPI)', t.value, estCls, t.page, t.quote);
+      notes.push(`The study's non-cash overhead total of ${dollars(t.value)} (page ${t.page}) is its yearly establishment charge. That charge ${chargeHow}.`);
+    } else if (charge && charge.value > 0 && charge.value < t.value) {
       ncRow('nc-0', 'Capital recovery, insurance and taxes on equipment and other investments (printed total less the establishment charge)', t.value - charge.value, ncCls, t.page, t.quote);
       ncRow('nc-establishment', recalc ? 'Establishment cost, yearly charge (recalculated)' : 'Establishment cost, yearly charge (CPI)', charge.value, estCls, charge.page, charge.quote);
       notes.push(`The study's non-cash overhead total of ${dollars(t.value)} (page ${t.page}) includes a yearly establishment charge of ${dollars(charge.value)} (page ${charge.page}). That charge ${chargeHow}; the remaining ${dollars(t.value - charge.value)} uses the machinery index.`);
