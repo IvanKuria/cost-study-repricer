@@ -3,6 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import type { ParsedStudy } from '../data/studySchema';
 import { repriceStudy, referencePeriod, DEFAULT_SETTINGS, NOT_REPRODUCED_NOTE, fallbackCount, usesFallback, mainReturnIndex } from './reprice';
 import { SERIES, latestPeriod, lookup, seriesById } from './series';
+import { crf as capitalRecoveryFactor } from './crf';
 
 const load = (id: string) => JSON.parse(readFileSync(`data/studies/parsed/${id}.json`, 'utf8')) as ParsedStudy;
 const ALMOND = 'almonds-2024sacvalleyalmonds7-5-24-final-draft';
@@ -284,7 +285,7 @@ describe('recalculated yearly establishment charge', () => {
   const AVOCADO = 'avocados-2020avocadohighdensitysandiegocounty';
   const avocado = load(AVOCADO);
   const contract = {
-    basisYear: { index: 2, label: '3rd' },
+    basisYear: { index: 2, label: '3rd', row: null, lessReturns: null },
     capitalRecovery: { ratePct: { value: 5.5, page: 18, quote: 'interest rate 5.5%' }, years: { value: 30, page: 23, quote: 'Establishment Costs 568,180 30' }, computed: 1955, reproduces: true },
     investmentCharges: { insurance: 252 / 20, taxes: 2841 / 20, acres: 20, insuranceRatePct: null, taxRatePct: null, page: 23, quote: 'Establishment Costs 568,180 30 0 39,094 252 2,841 0 42,186' },
   };
@@ -326,7 +327,7 @@ describe('recalculated yearly establishment charge', () => {
     const r = row(t, 'nc-establishment');
     expect(r.cells.total.repriced).toBeCloseTo(basis * crf(0.055, 30), 8);
     const money = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
-    expect(r.sourceNote).toBe(`Recalculated: ${money(basis)} repriced establishment cost (year 3) x CRF(5.5%, study rate, 30 years) = ${money(basis * crf(0.055, 30))}.`);
+    expect(r.sourceNote).toBe(`Recalculated: ${money(basis)} repriced establishment cost (year 3, accumulated net cash cost) x CRF(5.5%, study rate, 30 years) = ${money(basis * crf(0.055, 30))}.`);
     expect(r.cells.total.note).toBe(r.sourceNote);
     expect(t.notes!.some(n => n.includes(r.sourceNote!))).toBe(true);
     // Income is not indexed, but a lender's income edit moves the basis.
@@ -348,7 +349,7 @@ describe('recalculated yearly establishment charge', () => {
       expect(rest.cells.total.repriced).toBeCloseTo((printed - share) * cpiF, 8);
       expect(est.cells.total.repriced).toBeCloseTo(share * scale, 8);
       expect(est.page).toBe(23); expect(rest.page).not.toBeNull();
-      expect(est.sourceNote).toMatch(/^Recalculated: \$\d+ study (insurance|property tax) on establishment x \(\$[\d,]+ repriced establishment cost \(year 3\) \/ \$28,409 in the study\) = \$\d+\.$/);
+      expect(est.sourceNote).toMatch(/^Recalculated: \$\d+ study (insurance|property tax) on establishment x \(\$[\d,]+ repriced establishment cost \(year 3, accumulated net cash cost\) \/ \$28,409 in the study\) = \$\d+\.$/);
     }
     const items = t.rows.filter(r => r.section === 'Cash overhead' && r.kind === 'overheadItem');
     expect(row(t, 'total-cash-oh').cells.total.repriced).toBeCloseTo(items.reduce((s, r) => s + r.cells.total.repriced!, 0), 8);
@@ -357,7 +358,7 @@ describe('recalculated yearly establishment charge', () => {
     const rated = repriceStudy(tier1({ investmentCharges: { ...contract.investmentCharges, taxRatePct: 1 } }), prod);
     const taxEst = row(rated, `${lineId(rated, 'Property Taxes, other investments')}-establishment`);
     expect(taxEst.cells.total.repriced).toBeCloseTo(0.01 * basis.repriced! / 2, 8);
-    expect(taxEst.sourceNote).toMatch(/^Recalculated: 1% property tax rate x \$[\d,]+ repriced establishment cost \(year 3\) \/ 2 average investment = \$\d+\.$/);
+    expect(taxEst.sourceNote).toMatch(/^Recalculated: 1% property tax rate x \$[\d,]+ repriced establishment cost \(year 3, accumulated net cash cost\) \/ 2 average investment = \$\d+\.$/);
   });
 
   it('the interest rate in use replaces the study rate in the CRF; a lender capital recovery rate beats both', () => {
@@ -413,6 +414,52 @@ describe('recalculated yearly establishment charge', () => {
     expect(n.rows.some(r => /Property insurance on establishment/.test(r.label))).toBe(false);
     expect(n.notes!.join(' ')).toMatch(/insurance on the establishment investment \(\$10 per acre\), page 9, could not be matched/);
     expect(n.rows.find(r => r.label === 'Property Taxes, other investments')!.cells.total.original).toBe(230);
+  });
+
+  // The basis is the establishment-table row the study amortizes: the one whose printed value is the cited total.
+  const lender = { ...prod, targetPeriod: '2026-07', interestRate: 0.0751 };
+  const tableCell = (s: ParsedStudy, label: string, col: string) => repriceStudy(s, { ...lender, layout: 'establishment' }).rows.find(r => r.label === label)!.cells[col];
+  it('single-column table: the charge is the repriced TOTAL CASH COSTS x CRF', () => {
+    const alfalfa = load('alfalfa-16alfalfasjv300acfinal-41916');
+    const basis = tableCell(alfalfa, 'TOTAL CASH COSTS/ACRE', 'y1');
+    expect(basis.original).toBe(888);
+    const r = row(repriceStudy(alfalfa, lender), 'nc-establishment');
+    expect(r.cells.total.recalculated).toBe(true);
+    expect(r.cells.total.repriced).toBeCloseTo(basis.repriced! * crf(0.0751, 3), 8);
+    expect(r.sourceNote).toContain('repriced establishment cost (year 1, total cash cost) x CRF(7.51%, interest rate in use, 3 years)');
+  });
+  it('avocado 2011: the basis is the TOTAL ACCUMULATED NET COST the study amortizes, not the accumulated net cash cost', () => {
+    const s = load('avocados-avocadoconventionalsdr2011');
+    const basis = tableCell(s, 'TOTAL ACCUMULATED NET COST', 'y6');
+    expect(basis.original).toBe(32407);
+    const r = row(repriceStudy(s, lender), 'nc-establishment');
+    expect(r.cells.total.repriced).toBeCloseTo(basis.repriced! * crf(0.0751, 30), 8);
+    expect(r.sourceNote).toContain('repriced establishment cost (year 6, accumulated net cost)');
+    // The parser's named row wins over the value match.
+    const named: ParsedStudy = { ...s, establishmentSummary: { ...s.establishmentSummary!, basisYear: { index: 5, label: 'Year 6', row: 'ACCUMULATED  NET CASH COSTS', lessReturns: null } } };
+    expect(row(repriceStudy(named, lender), 'nc-establishment').cells.total.repriced).toBeCloseTo(tableCell(s, 'ACCUMULATED NET CASH COSTS', 'y6').repriced! * crf(0.0751, 30), 8);
+  });
+  it('falls back to the repriced printed total when no table row can be the basis', () => {
+    const s = load('alfalfa-16alfalfasjv300acfinal-41916');
+    const table = s.establishment!.table!;
+    const noBasis: ParsedStudy = { ...s, establishment: { ...s.establishment!, table: { ...table, rows: table.rows.filter(r => !/^TOTAL CASH COSTS/.test(r.label)) } } };
+    const r = row(repriceStudy(noBasis, lender), 'nc-establishment');
+    const cpi = SERIES.find(x => x.id === 'bls.cpi')!;
+    const factor = lookup(cpi, '2026-07')!.value / lookup(cpi, referencePeriod(s, DEFAULT_SETTINGS).period)!.value;
+    expect(r.cells.total.recalculated).toBe(true);
+    expect(r.cells.total.repriced).toBeCloseTo(888 * factor * crf(0.0751, 3), 6);
+    expect(r.sourceNote).toContain('repriced establishment cost (printed total)');
+  });
+  it('a study that does not amortize establishment says why, with no yearly charge and no CPI wording', () => {
+    const s = load('alfalfa-16alfalfasjv300acfinal-41916');
+    const reason = 'the study charges no yearly establishment cost';
+    const none: ParsedStudy = { ...s, establishmentSummary: { ...s.establishmentSummary!, annualCharge: null, capitalRecovery: null, reason } };
+    const t = repriceStudy(none, lender);
+    expect(t.establishmentNote).toBe('Establishment: The study charges no yearly establishment cost. No yearly establishment charge is included.');
+    expect(t.rows.some(r => r.id === 'nc-establishment')).toBe(false);
+    expect(repriceStudy(none, { ...lender, layout: 'establishment' }).establishmentNote).toContain('The study charges no yearly establishment cost.');
+    const total: ParsedStudy = { ...none, establishment: null, establishmentSummary: { ...none.establishmentSummary!, status: 'total', reason: 'establishment cost is included in the land value' } };
+    expect(repriceStudy(total, lender).establishmentNote).toMatch(/not added to the yearly total cost\. Establishment cost is included in the land value\.$/);
   });
 });
 
@@ -516,7 +563,7 @@ describe('crop specific return lines', () => {
     // The capital recovery basis (accumulated net cash cost) falls by the extra income, and the yearly charge with it.
     const pBase = repriceStudy(s, prod), pEdited = repriceStudy(s, { ...prod, overrides: { 'ret-0:price': price } });
     const charge = (t: ReturnType<typeof repriceStudy>) => cell(t, 'nc-establishment');
-    expect(charge(pEdited).note).toContain(`$${Math.round(acc(estEdited)).toLocaleString('en-US')} repriced establishment cost (year 3)`);
+    expect(charge(pEdited).note).toContain(`$${Math.round(acc(estEdited)).toLocaleString('en-US')} repriced establishment cost (year 3, accumulated net cash cost)`);
     expect(charge(pBase).repriced! - charge(pEdited).repriced!).toBeGreaterThan(0);
     expect(charge(pEdited).repriced! / charge(pBase).repriced!).toBeCloseTo(acc(estEdited) / acc(estBase), 6);
     expect(pEdited.notes!.some(n => /Shared sale price/.test(n))).toBe(true);
@@ -557,5 +604,13 @@ describe('shared sale price only links lines counted in the establishment yield 
   it('links pomegranate boxes to "28 Pound Boxes" and keeps olive oil gallons apart from a yield in tons', () => {
     expect(mainReturnIndex(load('pomegranates-pomegranatevs2010'))).toBe(0);
     expect(mainReturnIndex(load('olive-oil-2016oliveoilsacvalley-highdensityfinaldraft7'))).toBe(-1);
+  });
+});
+
+describe('capital recovery factor', () => {
+  it('is straight-line at 0%, and matches the UC formula otherwise', () => {
+    expect(capitalRecoveryFactor(0, 4)).toBe(1 / 4);
+    expect(capitalRecoveryFactor(0, 30)).toBe(1 / 30);
+    expect(capitalRecoveryFactor(0.05, 25)).toBeCloseTo(0.05 * 1.05 ** 25 / (1.05 ** 25 - 1), 12);
   });
 });

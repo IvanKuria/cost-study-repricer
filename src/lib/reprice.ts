@@ -1,4 +1,4 @@
-import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, OperationRow, ParsedStudy } from '../data/studySchema';
+import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, EstablishmentTableRow, OperationRow, ParsedStudy } from '../data/studySchema';
 import type { Category, CategoryMapping, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
@@ -99,6 +99,9 @@ const dollars = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 export const establishmentSource = (total: NonNullable<EstablishmentSummary['total']>) => `printed in ${SOURCE_WORDS[total.source] ?? 'the study'}, page ${total.page}`;
 export const NO_ESTABLISHMENT_NOTE = 'This study prints no establishment cost we could find; establishment is not included.';
 const ESTABLISHMENT_CPI_NOTE = 'Establishment cost without a usable establishment table is repriced with the CPI (BLS CPI-U, all items), following the professor\'s rule.';
+const sentence = (s: string) => { const t = s.trim(); return `${t[0].toUpperCase()}${t.slice(1)}${/[.!?"']$/.test(t) ? '' : '.'}`; };
+/** Why the study charges no yearly establishment cost (it does not amortize it), as the parser states it; null otherwise. */
+const noChargeReason = (e: EstablishmentSummary) => e.status !== 'none' && e.capitalRecovery === null && !e.annualCharge && e.reason?.trim() ? sentence(e.reason) : null;
 const hasUsableTable = (study: ParsedStudy) => !!(study.establishment?.table?.years.length && study.establishment.table.rows.length);
 const pct = (rate: number) => `${Number((rate * 100).toFixed(3))}%`;
 export const NOT_REPRODUCED_NOTE = 'Establishment yearly charge: the study\'s printed charge could not be reproduced from its stated rate and years, so it is adjusted by the CPI instead.';
@@ -108,21 +111,50 @@ interface EstablishmentBasis { original: number; repriced: number; words: string
 /** The UC capital recovery inputs, ready to recalculate the yearly establishment charge, insurance and taxes. */
 interface EstablishmentRecalc { basis: EstablishmentBasis; rate: number; years: number; rateSource: 'lender' | 'interest' | 'study' }
 
-/** Tier 1: the accumulated net cash cost at the study's amortization year, from the repriced establishment table.
+/** Establishment-table rows a study may amortize, in order of preference, with their plain words. Labels may be split ("CAS H"). */
+const BASIS_ROWS: { test: (r: EstablishmentTableRow) => boolean; words: string }[] = [
+  { test: r => r.kind === 'accumulated' && /CAS\s*H/i.test(r.label), words: 'accumulated net cash cost' },
+  { test: r => r.kind === 'accumulated', words: 'accumulated net cost' },
+  { test: r => r.kind === 'net' && /NET\s*CAS\s*H/i.test(r.label), words: 'net cash cost' },
+  { test: r => r.kind === 'total' && /^TOTAL\s*CAS\s*H\s*COS\s*TS?\b/i.test(r.label), words: 'total cash cost' },
+  { test: r => r.kind === 'total' && /^TOTAL\s*OPERATING\s*COS\s*TS?\b/i.test(r.label), words: 'total operating cost' },
+];
+const squash = (s: string) => s.replace(/\s+/g, '').toUpperCase();
+const rowWords = (r: EstablishmentTableRow) => BASIS_ROWS.find(b => b.test(r))?.words ?? r.label.replace(/\s+/g, ' ').replace(/\s*(\/\s*ACRE|PER ACRE)\b/i, '').trim().toLowerCase();
+
+/** The establishment-table row the study amortizes at the basis year: the parser's named row, else the preferred row whose
+ *  printed value equals the cited establishment total, else the accumulated net cash cost row. -1 when none. */
+function basisRow(study: ParsedStudy, est: EstablishmentTable, index: number): number {
+  const { basisYear: by, total } = establishmentSummaryOf(study);
+  if (by?.row) { const i = est.rows.findIndex(r => squash(r.label) === squash(by.row!)); if (i >= 0) return i; }
+  const near = (v: number | null | undefined) => v != null && total != null && Math.abs(v - total.value) <= Math.max(1, 0.005 * Math.abs(total.value));
+  for (const b of BASIS_ROWS) { const i = est.rows.findIndex(r => b.test(r) && near(r.values[index])); if (i >= 0) return i; }
+  return est.rows.findIndex(BASIS_ROWS[0].test);
+}
+
+/** The printed establishment total repriced with the CPI, for a study whose table gives no basis row. */
+function printedTotalCell(study: ParsedStudy, F: (c: CellClass) => Factor): RepricedCell | null {
+  const t = establishmentSummaryOf(study).total;
+  const cls: CellClass = { category: 'establishmentCpi', confidence: 'column' };
+  return t ? cellFrom(t.value, cls, F(cls)) : null;
+}
+
+/** Tier 1: the establishment-table row the study amortizes, at its amortization year, from the repriced table.
  *  Tier 2: the repriced printed establishment total (including any lender edit). Null when neither is available. */
 function establishmentBasis(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor, totalRow: RepricedRow | null): EstablishmentBasis | null {
   const est = study.establishment?.table;
   if (est && hasUsableTable(study)) {
     const by = establishmentSummaryOf(study).basisYear;
-    if (!by || by.index < 0 || by.index >= est.years.length) return null;
-    const i = est.rows.findIndex(r => r.kind === 'accumulated' && /CASH/i.test(r.label));
-    if (i < 0) return null;
-    const t = establishmentLayout(study, est, { ...settings, layout: 'establishment' }, ref, target, F);
-    const cell = t.rows.find(r => r.id === `e-${i}`)?.cells[`y${by.index + 1}`];
-    if (cell?.original == null || cell.repriced == null) return null;
-    return { original: cell.original, repriced: cell.repriced, words: `repriced establishment cost (year ${by.index + 1})` };
+    const i = by && by.index >= 0 && by.index < est.years.length ? basisRow(study, est, by.index) : -1;
+    if (by && i >= 0) {
+      const t = establishmentLayout(study, est, { ...settings, layout: 'establishment' }, ref, target, F);
+      const cell = t.rows.find(r => r.id === `e-${i}`)?.cells[`y${by.index + 1}`];
+      // A costs-only table amortized net of that year's returns (peppermint): the cited returns come off, not indexed.
+      const less = by.lessReturns?.value ?? 0;
+      if (cell?.original != null && cell.repriced != null) return { original: cell.original - less, repriced: cell.repriced - less, words: `repriced establishment cost (year ${by.index + 1}, ${rowWords(est.rows[i])}${less ? ` less ${dollars(less)} returns` : ''})` };
+    }
   }
-  const c = totalRow?.cells.total;
+  const c = totalRow?.cells.total ?? printedTotalCell(study, F);
   if (c?.original == null || c.repriced == null) return null;
   return { original: c.original, repriced: c.repriced, words: 'repriced establishment cost (printed total)' };
 }
@@ -512,11 +544,15 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     rows.push({ id: 'h-establishment', label: 'ESTABLISHMENT COST (ONE-TIME INVESTMENT)', kind: 'heading', section: 'Establishment', timeHrs: null, cells: {}, page: null, quote: null });
     estTotalRow.sourceNote = `${establishmentSource(estTotal)[0].toUpperCase()}${establishmentSource(estTotal).slice(1)}. One-time investment, not added to the yearly total cost.${yearly}`;
     rows.push(estTotalRow);
-    establishmentNote = `Establishment cost: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}, repriced with the CPI. It is a one-time investment and is not added to the yearly total cost.${yearly}`;
+    const noCharge = noChargeReason(estSummary);
+    establishmentNote = `Establishment cost: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}, repriced with the CPI. It is a one-time investment and is not added to the yearly total cost.${yearly}${noCharge ? ` ${noCharge}` : ''}`;
     notes.push(ESTABLISHMENT_CPI_NOTE);
   } else if (!estTotal && estSummary.status === 'none' && estSummary.perennial && !hasUsableTable(study)) {
     establishmentNote = NO_ESTABLISHMENT_NOTE;
     if (estSummary.reason) notes.push(`Establishment: ${estSummary.reason}`);
+  } else if (noChargeReason(estSummary)) {
+    // The study does not amortize its establishment cost: say why, and add no yearly charge.
+    establishmentNote = `Establishment: ${noChargeReason(estSummary)} No yearly establishment charge is included.`;
   }
 
   return {
@@ -552,7 +588,10 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const sum = (rs: RepricedRow[], c: string, field: 'original' | 'repriced') => rs.reduce((v, r) => v + (r.cells[c]?.[field] ?? 0), 0);
   const isCash = (r: RepricedRow) => /cash overhead/i.test(r.section) && !/non[- ]?cash/i.test(r.section);
   const isNoncash = (r: RepricedRow) => /non[- ]?cash|capital recovery|interest on investment/i.test(r.section);
-  const amount = (key: string, col: string, field: 'original' | 'repriced') => totals.get(key)?.cells[col]?.[field] ?? 0;
+  // A table without a TOTAL COST row (e.g. the 2011 avocado studies) still has a total cost: cash plus non-cash.
+  const amount = (key: string, col: string, field: 'original' | 'repriced'): number => key === 'total' && !totals.has('total') && totals.has('cash')
+    ? amount('cash', col, field) + amount('noncash', col, field)
+    : totals.get(key)?.cells[col]?.[field] ?? 0;
   const deltaTotal = (original: number | null, before: number, after: number): RepricedCell => {
     const delta = after - before;
     return plainCell(original, original === null && Math.abs(delta) < 1e-8 ? null : (original ?? 0) + delta);
@@ -659,7 +698,8 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
     rows.push(row);
   });
   const estTotal = establishmentSummaryOf(study).total;
-  const establishmentNote = estTotal ? `Establishment cost total: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}.` : null;
+  const noCharge = noChargeReason(establishmentSummaryOf(study));
+  const establishmentNote = [estTotal && `Establishment cost total: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}.`, noCharge && `${noCharge} No yearly establishment charge is included.`].filter(Boolean).join(' ') || null;
   notes.add('Establishment costs are repriced row by row from the establishment table, each row with the index for its category.');
   const last = cols.find(c => c.key === settings.summaryColumn) ?? cols.at(-1)!;
   const totalRow = totals.get('total') ?? totals.get('cash');
