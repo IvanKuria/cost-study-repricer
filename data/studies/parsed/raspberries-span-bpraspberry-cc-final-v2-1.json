@@ -671,7 +671,7 @@
     },
     {
      "label": "COSTOS AGRONÓMICOS TOTALES",
-     "kind": "operation",
+     "kind": "subtotal",
      "section": "Costos agronómicos",
      "values": [
       null,
@@ -736,7 +736,7 @@
     },
     {
      "label": "COSTOS/ACRE DE OPERACIÓN TOTAL",
-     "kind": "operation",
+     "kind": "total",
      "section": "Costos de cosecha",
      "values": [
       8523,
@@ -826,21 +826,8 @@
      "quote": "COSTOS NETOS DE EFECTIVO / ACRE PARA EL AÑO 11,219"
     },
     {
-     "label": "RETORNOS NETOS / ACRE POR ENCIMA DE LOS COSTOS DE",
-     "kind": "operation",
-     "section": "Costos de cosecha",
-     "values": [
-      null,
-      null,
-      null,
-      null
-     ],
-     "page": 14,
-     "quote": "RETORNOS NETOS / ACRE POR ENCIMA DE LOS COSTOS DE"
-    },
-    {
-     "label": "EFECTIVO",
-     "kind": "operation",
+     "label": "RETORNOS NETOS / ACRE POR ENCIMA DE LOS COSTOS DE EFECTIVO",
+     "kind": "net",
      "section": "Costos de cosecha",
      "values": [
       null,
@@ -849,7 +836,7 @@
       9548
      ],
      "page": 14,
-     "quote": "EFECTIVO 5,477 16,131 9,548"
+     "quote": "RETORNOS NETOS / ACRE POR ENCIMA DE LOS COSTOS DE EFECTIVO 5,477 16,131 9,548"
     },
     {
      "label": "COSTOS DE EFECTIVO NETOS ACUMULADOS / ACRE",
@@ -944,7 +931,7 @@
     },
     {
      "label": "RETORNOS NETOS / ACRE POR ENCIMA DEL COSTO TOTAL",
-     "kind": "operation",
+     "kind": "net",
      "section": "Gastos generales en efectivo (costo de recuperación de capital)",
      "values": [
       null,

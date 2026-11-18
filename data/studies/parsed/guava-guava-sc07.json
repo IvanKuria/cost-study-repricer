@@ -1000,19 +1000,6 @@
      "quote": "TOTAL CAS H COS TS /ACRE 7112 4254 5323 6825"
     },
     {
-     "label": "Harves ted Guava (in Carton)",
-     "kind": "overheadItem",
-     "section": "CA SH OVERHEA D",
-     "values": [
-      0,
-      0,
-      78,
-      233
-     ],
-     "page": 15,
-     "quote": "Harves ted Guava (in Carton) 0 0 78 233"
-    },
-    {
      "label": "Revenue from Sale @ $48.25/Carton",
      "kind": "income",
      "section": "CA SH OVERHEA D",
@@ -1167,19 +1154,6 @@
      ],
      "page": 15,
      "quote": "TOTAL COS TS /ACRE 10398 7561 8630 10132"
-    },
-    {
-     "label": "Harves ted Guava (in Carton)",
-     "kind": "overheadItem",
-     "section": "NON-CA SH OVERHEA D",
-     "values": [
-      0,
-      0,
-      78,
-      233
-     ],
-     "page": 15,
-     "quote": "Harves ted Guava (in Carton) 0 0 78 233"
     },
     {
      "label": "Revenue from Sale @ $48.25/Carton",
@@ -1380,7 +1354,9 @@
    "several costs-per-acre tables (establishment and production); using the production one",
    "Table 1 prints one combined fuel, lube and repairs column; it is stored under fuel with lubeRepairs null",
    "equipment row without a Total column: 2007 A TV 4WD",
-   "equipment row without a Total column: 2007 Weed Wacker"
+   "equipment row without a Total column: 2007 Weed Wacker",
+   "establishment table: Harves ted Guava (in Carton) (page 15) is a yield line, not a cost; left out of the table",
+   "establishment table: Harves ted Guava (in Carton) (page 15) is a yield line, not a cost; left out of the table"
   ]
  }
 }

@@ -1624,7 +1624,7 @@
      "section": "Harvest",
      "values": [
       14770,
-      2.441,
+      2441,
       3277
      ],
      "page": 14,
@@ -2129,6 +2129,8 @@
    "laborOverheadPct",
    "landRentPerAcre"
   ],
-  "warnings": []
+  "warnings": [
+   "establishment table: TOTAL OPERATING COSTS/ACRE column 2nd prints 2.441 with a period for the thousands comma; read as 2441 (page 14)"
+  ]
  }
 }

@@ -1796,7 +1796,7 @@
       1084,
       1577,
       1742,
-      2.099,
+      2099,
       2602
      ],
      "page": 13,
@@ -2175,9 +2175,9 @@
    {
     "year": 6,
     "label": "6th",
-    "totalCost": 2.099,
+    "totalCost": 2099,
     "returns": 2500,
-    "netCost": -2497.901,
+    "netCost": -401,
     "accumulated": 8255,
     "page": 13,
     "quote": "ACCUMULATED NET CASH COSTS/ACRE 5,008 6,128 7,212 8,164 8,656 8,255 4,982"
@@ -2320,7 +2320,8 @@
   "warnings": [
    "monthly table not used: MONTHLY COSTS PER ACRE TO PRODUCE WALNUTS: TOTAL CASH COSTS row: months sum to 2607 but the Total column says 2767",
    "establishment table: TOTAL CULTURAL COSTS column Est/1st prints 525 but its rows sum to 467",
-   "establishment table: TOTAL CULTURAL COSTS column 2nd prints 634 but its rows sum to 573"
+   "establishment table: TOTAL CULTURAL COSTS column 2nd prints 634 but its rows sum to 573",
+   "establishment table: TOTAL CASH COSTS/ACRE column 6th prints 2.099 with a period for the thousands comma; read as 2099 (page 13)"
   ]
  }
 }

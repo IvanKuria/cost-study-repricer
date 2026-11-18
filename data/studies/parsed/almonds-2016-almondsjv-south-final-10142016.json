@@ -2184,8 +2184,8 @@
     },
     {
      "label": "Cash Overhead",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "heading",
+     "section": "Cash Overhead",
      "values": [
       null,
       null,
@@ -2198,8 +2198,8 @@
     },
     {
      "label": "Liability Insurance",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       8,
       8,
@@ -2212,8 +2212,8 @@
     },
     {
      "label": "Office Expense",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       60,
       60,
@@ -2226,8 +2226,8 @@
     },
     {
      "label": "Sanitation Fees",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       8,
       8,
@@ -2240,8 +2240,8 @@
     },
     {
      "label": "Environmental Fee",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       10,
       10,
@@ -2254,8 +2254,8 @@
     },
     {
      "label": "Property Taxes",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       262,
       262,
@@ -2268,8 +2268,8 @@
     },
     {
      "label": "Property Insurance",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       22,
       22,
@@ -2282,8 +2282,8 @@
     },
     {
      "label": "Investment Repairs",
-     "kind": "operation",
-     "section": "Harvest",
+     "kind": "overheadItem",
+     "section": "Cash Overhead",
      "values": [
       39,
       39,
@@ -2297,7 +2297,7 @@
     {
      "label": "TOTAL CASH OVERHEAD COSTS",
      "kind": "total",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       409,
       409,
@@ -2311,7 +2311,7 @@
     {
      "label": "TOTAL CASH COSTS/ACRE",
      "kind": "total",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       4666,
       1876,
@@ -2325,7 +2325,7 @@
     {
      "label": "INCOME/ACRE FROM PRODUCTION",
      "kind": "income",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       null,
       null,
@@ -2339,7 +2339,7 @@
     {
      "label": "NET CASH COSTS/ACRE FOR THE YEAR",
      "kind": "net",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       4666,
       1876,
@@ -2353,7 +2353,7 @@
     {
      "label": "PROFIT/ACRE ABOVE CASH COSTS",
      "kind": "net",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       null,
       null,
@@ -2367,7 +2367,7 @@
     {
      "label": "ACCUMULATED NET CASH COSTS/ACRE",
      "kind": "accumulated",
-     "section": "Harvest",
+     "section": "Cash Overhead",
      "values": [
       4666,
       6542,
@@ -2576,7 +2576,7 @@
     }
    ],
    "yieldRow": {
-    "label": "Meat Pounds Per Acre @$2.25/lbs.",
+    "label": "Meat Pounds Per Acre @$2.25/lb",
     "values": [
      null,
      null,

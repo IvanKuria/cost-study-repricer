@@ -1,5 +1,5 @@
 import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, EstablishmentTableRow, OperationRow, ParsedStudy } from '../data/studySchema';
-import type { Category, CategoryMapping, LaborDetail, LaborRates, LaborWage, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
+import type { Category, CategoryMapping, EstablishmentNet, EstablishmentTotalKey, LaborDetail, LaborRates, LaborWage, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
 import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
@@ -665,6 +665,28 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
 
 interface EstablishmentCharge { value: number; note: string; after: number; studyValue: number }
 
+// Establishment table labels, matched without spaces: the text layer splits some words ("TOTAL CAS H COS TS"), and the
+// Spanish studies print their own wording.
+const squashU = (s: string) => s.toUpperCase().replace(/\s+/g, '');
+/** Which total an establishment table row is, from its label. */
+export function establishmentTotalKey(label: string): EstablishmentTotalKey | null {
+  const D = squashU(label);
+  if (/^TOTALOPERATING|^COSTOSTOTALESDEOPERACI/.test(D)) return 'operating';
+  if (/^TOTALCASHOVERHEAD|^COSTOSTOTALESGENERALESENEFECTIVO/.test(D)) return 'cashOh';
+  if (/^TOTAL(?:NON-?CASH|CAPITALRECOVERY|INTERESTONINVESTMENT)|^COSTOTOTALGENERALSINEFECTIVO/.test(D)) return 'noncash';
+  if (/^TOTAL(?:ALL)?CASHCOSTS?|^TOTALDECOSTOSDEEFECTIVO/.test(D)) return 'cash';
+  if (/^TOTAL(?:ALL)?COSTS?(?:\/ACRE|PERACRE|FORTHEYEAR|$)|^COSTO\/ACRETOTAL/.test(D)) return 'total';
+  return null;
+}
+const noncashSection = (section: string) => /NON-?CASH|CAPITALRECOVERY|INTERESTONINVESTMENT|SINEFECTIVO|RECUPERACI[OÓ]NDECAPITAL/.test(squashU(section));
+const cashSection = (section: string) => /CASHOVERHEAD/.test(squashU(section)) && !noncashSection(section);
+/** A net row's label: a profit (income less cost) or a net cost, and the cost it nets: operating, cash, or total
+ *  (a TOTAL label, or a net row of the non-cash section that does not say cash). */
+function netLabel(label: string, section: string): Omit<EstablishmentNet, 'clamped'> {
+  const D = squashU(label);
+  return { profit: /PROFIT|RETURNS|INCOME|GANANCIA|RETORNO/.test(D), basis: /OPERATING/.test(D) ? 'operating' : /TOTAL/.test(D) || (!/CASH/.test(D) && noncashSection(section)) ? 'total' : 'cash' };
+}
+
 /** The recalculated yearly establishment charge for the establishment table's bearing years, from the same basis and
  *  rate as the production table. Null when the study's charge cannot be recalculated. */
 function establishmentCharge(study: ParsedStudy, settings: RepriceSettings, ref: string, target: string, F: (c: CellClass) => Factor): EstablishmentCharge | null {
@@ -686,8 +708,8 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const totals = new Map<string, RepricedRow>();
   const incomeCells: Record<string, RepricedCell> = {};
   const sum = (rs: RepricedRow[], c: string, field: 'original' | 'repriced') => rs.reduce((v, r) => v + (r.cells[c]?.[field] ?? 0), 0);
-  const isCash = (r: RepricedRow) => /cash overhead/i.test(r.section) && !/non[- ]?cash/i.test(r.section);
-  const isNoncash = (r: RepricedRow) => /non[- ]?cash|capital recovery|interest on investment/i.test(r.section);
+  const isCash = (r: RepricedRow) => cashSection(r.section);
+  const isNoncash = (r: RepricedRow) => noncashSection(r.section);
   // A table without a TOTAL COST row (e.g. the 2011 avocado studies) still has a total cost: cash plus non-cash.
   const amount = (key: string, col: string, field: 'original' | 'repriced'): number => key === 'total' && !totals.has('total') && totals.has('cash')
     ? amount('cash', col, field) + amount('noncash', col, field)
@@ -709,19 +731,86 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const incomeNote = !est.yieldRow ? 'Returns are not indexed. Type a value to update.'
     : usdaSale ? `Income is each printed yield x the study price adjusted by USDA's California price change (${money2(usdaSale.price)}, ${usdaSale.studyYear} to ${usdaSale.year}). Change the sale price per unit or type a value to update.`
       : 'Returns are not indexed. Change the sale price per unit or type a value to update.';
+  // The study's figures, to read how each net row was printed. A total row's printed value in a column, as of row `before`.
+  const near = (a: number, b: number) => Math.abs(a - b) <= Math.max(2, Math.abs(b) * 0.005);
+  // Any row kind: 2013 walnuts print TOTAL CAPITAL RECOVERY as an item line of the cash overhead section.
+  const keys = est.rows.map(r => r.kind === 'heading' || r.kind === 'net' || r.kind === 'accumulated' ? null : establishmentTotalKey(r.label));
+  const printedTotal = (key: EstablishmentTotalKey, k: number, before: number): number | null => {
+    for (let j = before - 1; j >= 0; j--) if (keys[j] === key) return est.rows[j].values[k] ?? null;
+    if (key !== 'total') return null;
+    const c = printedTotal('cash', k, before), n = printedTotal('noncash', k, before);
+    return c == null && n == null ? null : (c ?? 0) + (n ?? 0);
+  };
+  // One income per year for every net row: the printed income that matches the year's yield x the study price, else the
+  // first printed. Studies sometimes print another figure in a later section (2002 minneola: $8 a carton in the cash
+  // section, the $13 its text states in the total section; 2002 boysenberry: the cash profit in place of the income).
+  const incomeRows = est.rows.filter(r => r.kind === 'income');
+  const studyPrice = studySalePrice(study);
+  const canon = cols.map((_, k) => {
+    const vs = incomeRows.map(r => r.values[k]).filter((v): v is number => v != null);
+    const y = est.yieldRow?.values[k], target = studyPrice != null && y != null ? y * studyPrice : null;
+    return (target == null ? undefined : vs.find(v => Math.abs(v - target) <= Math.max(2, target * 0.02))) ?? vs[0] ?? null;
+  });
+  // A TOTAL COST row whose figures are cash plus non-cash less income (the 2011 avocado studies) is the net cost.
+  est.rows.forEach((r, i) => {
+    if (keys[i] !== 'total') return;
+    const cols2 = r.values.map((v, k) => ({ v, k, cost: (printedTotal('cash', k, i) ?? 0) + (printedTotal('noncash', k, i) ?? 0), inc: canon[k] ?? 0 })).filter(x => x.v != null);
+    if (cols2.some(x => x.inc > 0 && !near(x.v!, x.cost)) && cols2.every(x => near(x.v!, x.cost - x.inc))) {
+      keys[i] = null;
+      notes.add(`${r.label} (page ${r.page}): the study's figures are cash plus non-cash costs less income, so the row is the net cost for the year, computed that way; total cost is cash plus non-cash costs.`);
+    }
+  });
+  const netAsTotal = new Set(est.rows.flatMap((r, i) => r.kind === 'total' && keys[i] == null && establishmentTotalKey(r.label) === 'total' ? [i] : []));
+  // Each net row: its label's profit or cost and basis; another basis when only that one reproduces its printed figures
+  // (2011 mandarins print the profit above total cost as "PROFIT ABOVE CASH COSTS"); clamped when it prints no negative
+  // but a blank or 0 the other way (a paired cost and profit row, or a NET INCOME row printing 0 for a loss).
+  const nets = new Map<number, EstablishmentNet>(), mirrorBlanks = new Map<number, boolean[]>();
+  est.rows.forEach((r, i) => {
+    if (r.kind !== 'net' && !netAsTotal.has(i)) return;
+    const lab = netLabel(r.label, r.section);
+    if (netAsTotal.has(i)) Object.assign(lab, { profit: false, basis: 'total' });
+    const sign = lab.profit ? -1 : 1;
+    // The income the study netted in this row: the section's own income row above it, else the year's income.
+    const localIncome = (k: number) => { for (let j = i - 1; j >= 0 && est.rows[j].section === r.section; j--) if (est.rows[j].kind === 'income') return est.rows[j].values[k] ?? 0; return canon[k] ?? 0; };
+    const raw = (b: EstablishmentNet['basis'], k: number) => { const c = printedTotal(b, k, i); return c == null ? null : sign * (c - localIncome(k)); };
+    const fits = (b: EstablishmentNet['basis']) => {
+      let any = false;
+      for (const [k, v] of r.values.entries()) {
+        if (v == null) continue;
+        const x = raw(b, k);
+        if (x == null) return false;
+        if (near(v, x)) { any ||= v !== 0; continue; }
+        if (v === 0 && x < 0) continue;
+        return false;
+      }
+      return any;
+    };
+    const other = (['operating', 'cash', 'total'] as const).filter(b => b !== lab.basis && fits(b));
+    if (!fits(lab.basis) && other.length === 1) {
+      notes.add(`${r.label} (page ${r.page}): its figures are income less ${other[0]} costs, not ${lab.basis} costs as the label says, so it is computed against ${other[0]} costs.`);
+      lab.basis = other[0];
+    }
+    const paired = est.rows.some((x, j) => j !== i && x.kind === 'net' && x.section === r.section && netLabel(x.label, x.section).profit !== lab.profit);
+    const clamped = !r.values.some(v => v != null && v < 0) && (paired || r.values.some((v, k) => !v && (raw(lab.basis, k) ?? 0) < -2));
+    nets.set(i, { ...lab, clamped });
+  });
+  // A pair where one row prints negatives shows each year once: 2012 pears print the profit row only in bearing years,
+  // 2023 raspberries the year-2 loss only in the returns row. A blank there stays blank.
+  for (const [i, n] of nets) {
+    const r = est.rows[i], mates = [...nets].filter(([j, m]) => j !== i && est.rows[j].section === r.section && m.profit !== n.profit);
+    if (mates.length && (!n.clamped || mates.some(([, m]) => !m.clamped))) mirrorBlanks.set(i, r.values.map((v, k) => v == null && mates.some(([j]) => est.rows[j].values[k] != null)));
+  }
+  const netMisses = new Map<number, string[]>(), incomeMisses = new Map<number, string[]>();
+  const miss = (m: Map<number, string[]>, i: number, s: string) => m.set(i, [...(m.get(i) ?? []), s]);
   let sectionDetails: RepricedRow[] = [];
   est.rows.forEach((r, i) => {
-    const kind: RepricedRow['kind'] = r.kind === 'income' ? 'returns' : r.kind === 'accumulated' ? 'total' : r.kind;
+    const net = nets.get(i);
+    const kind: RepricedRow['kind'] = net ? 'net' : r.kind === 'income' ? 'returns' : r.kind === 'accumulated' ? 'total' : r.kind;
     const row: RepricedRow = { id: `e-${i}`, label: r.label, kind, section: r.section, timeHrs: null, cells: {}, page: r.page, quote: r.quote };
     if (kind === 'heading') { sectionDetails = []; rows.push(row); return; }
-    const L = r.label.toUpperCase();
-    let totalKey: string | null = null;
-    if (/^TOTAL OPERATING/.test(L)) totalKey = 'operating';
-    else if (/^TOTAL CASH OVERHEAD/.test(L)) totalKey = 'cashOh';
-    else if (/^TOTAL (NON[- ]?CASH|CAPITAL RECOVERY|INTEREST ON INVESTMENT)/.test(L)) totalKey = 'noncash';
-    else if (/^TOTAL CASH COST/.test(L)) totalKey = 'cash';
-    else if (/^TOTAL COST(?:S)?(?:\/ACRE| PER ACRE| FOR THE YEAR)/.test(L)) totalKey = 'total';
-    const noncashNet = /TOTAL/.test(L) || (!/CASH/.test(L) && isNoncash(row));
+    const L = r.label.toUpperCase(), totalKey = keys[i];
+    if (totalKey) row.totalKey = totalKey;
+    if (net) row.net = net;
     cols.forEach((c, k) => {
       const original = r.values[k] ?? null;
       if (kind === 'operation' || kind === 'overheadItem') {
@@ -749,44 +838,56 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
         row.cells[c.key] = { ...plainCell(original, original == null ? null : original * (before > 0 ? after / before : 1) * rateRatio, 'operatingInterest'), note };
         applyOverride(row, c.key, settings);
       } else if (kind === 'returns') {
+        // Every income row carries the year's one income; a row printing another figure, or a blank, keeps it as its original.
         if (!incomeCells[c.key]) {
           const yieldValue = est.yieldRow?.values[k];
-          const rep = salePrice != null && yieldValue != null ? yieldValue * salePrice : original;
-          incomeCells[c.key] = { ...plainCell(original, rep), note: incomeNote };
+          const rep = salePrice != null && yieldValue != null ? yieldValue * salePrice : canon[k];
+          incomeCells[c.key] = { ...plainCell(canon[k], rep), note: incomeNote };
           const v = settings.overrides[`income:${c.key}`];
           if (v != null) incomeCells[c.key] = { ...incomeCells[c.key], repriced: v, overridden: true };
         }
         const income = incomeCells[c.key];
-        row.cells[c.key] = { ...income, ...deltaTotal(original, income.original ?? 0, income.repriced ?? 0), overridden: income.overridden };
+        row.cells[c.key] = { ...income, ...plainCell(original, original == null && !income.original && !income.repriced ? null : income.repriced), note: income.note, overridden: income.overridden };
+        if (income.original != null && (original == null ? income.original !== 0 : Math.abs(original - income.original) > 2)) miss(incomeMisses, i, `${c.label} ${original == null ? 'blank' : dollars(original)}, ${dollars(income.original)} used`);
       } else if (r.kind === 'accumulated') {
-        const key = /CASH/.test(L) ? 'cash' : 'total';
+        const key = /CASH|EFECTIVO/.test(squashU(L)) ? 'cash' : 'total';
         let before = 0, after = 0;
         for (const prev of cols.slice(0, k + 1)) {
           before += amount(key, prev.key, 'original') - (incomeCells[prev.key]?.original ?? 0);
           after += amount(key, prev.key, 'repriced') - (incomeCells[prev.key]?.repriced ?? 0);
         }
-        row.cells[c.key] = deltaTotal(original, before, after);
-      } else if (kind === 'net') {
-        const key = noncashNet ? 'total' : 'cash';
-        const before = amount(key, c.key, 'original') - (incomeCells[c.key]?.original ?? 0);
-        const after = amount(key, c.key, 'repriced') - (incomeCells[c.key]?.repriced ?? 0);
-        const profit = /PROFIT|RETURNS|INCOME/.test(L);
-        const paired = est.rows.some(x => x.kind === 'net' && x.section === r.section && /COST/.test(x.label) && !/PROFIT|RETURNS|INCOME/.test(x.label));
-        const expected = profit ? (paired ? Math.max(0, -before) : -before) : before;
-        if (original != null && Math.abs(original - expected) > Math.max(3, Math.abs(original) * 0.02)) notes.add(`${r.label}, ${c.label}: the printed net figure differs from cost less income. Its original difference is preserved.`);
-        if (profit && paired && !(original != null && original < 0)) {
-          row.cells[c.key] = deltaTotal(original, Math.max(0, -before), Math.max(0, -after));
-        } else if (!profit && est.rows.some(x => x.kind === 'net' && x.section === r.section && /PROFIT|RETURNS|INCOME/.test(x.label))) {
-          row.cells[c.key] = deltaTotal(original, Math.max(0, before), Math.max(0, after));
-        } else row.cells[c.key] = deltaTotal(original, profit ? -before : before, profit ? -after : after);
+        // The Spanish studies print the running total as net returns: -$23,245 is a $23,245 accumulated net cost.
+        const flip = original != null && original !== 0 && near(original, -before) && !near(original, before) ? -1 : 1;
+        row.cells[c.key] = deltaTotal(original, flip * before, flip * after);
+      } else if (net) {
+        // Computed from this year's (repriced) cost total and income, never carried from the printed figure.
+        const value = (f: 'original' | 'repriced'): number | null => {
+          const has = (key: string) => totals.get(key)?.cells[c.key]?.[f] != null;
+          const inc = incomeCells[c.key]?.[f] ?? null;
+          if (mirrorBlanks.get(i)?.[k] || (!(net.basis === 'total' && !totals.has('total') ? has('cash') || has('noncash') : has(net.basis)) && inc == null)) return null;
+          const x = (net.profit ? -1 : 1) * (amount(net.basis, c.key, f) - (inc ?? 0));
+          return !net.clamped || x >= 0 ? x : original === 0 ? 0 : null;
+        };
+        const study = value('original');
+        row.cells[c.key] = plainCell(original, value('repriced'));
+        if ((original ?? 0) !== 0 || (study ?? 0) !== 0 ? original == null || study == null || Math.abs(original - study) > 2 : false) miss(netMisses, i, `${c.label} ${original == null ? 'blank' : dollars(original)}, computed ${study == null ? 'blank' : dollars(study)}`);
       } else {
+        // A total's parts: the items since the last heading or total line (a study may print no heading above its cash
+        // overhead lines, as the almond studies do, or its non-cash lines, as 2003 apricots do), else those of its section.
         let group = sectionDetails;
         if (totalKey === 'operating') group = details.filter(d => d.kind === 'operation' || d.kind === 'interest');
-        if (totalKey === 'cashOh') group = details.filter(isCash);
-        if (totalKey === 'noncash') group = details.filter(isNoncash);
-        if (totalKey === 'cash') group = ['operating', 'cashOh'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []);
-        if (totalKey === 'total') group = ['cash', 'noncash'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []);
+        if (totalKey === 'cashOh' && !group.length) group = details.filter(isCash);
+        if (totalKey === 'noncash' && !group.length) group = details.filter(isNoncash);
+        // Higher totals: their part totals plus any lines printed after them (2002 Riverside grapes: interest after cash overhead).
+        if (totalKey === 'cash') group = [...['operating', 'cashOh'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []), ...sectionDetails];
+        if (totalKey === 'total') group = [...['cash', 'noncash'].flatMap(key => totals.get(key) ? [totals.get(key)!] : []), ...sectionDetails];
         const before = sum(group, c.key, 'original'), after = sum(group, c.key, 'repriced');
+        // A total printed without its lines (the Spanish summary tables' overhead) is priced by its own category.
+        if (!group.length && original != null) {
+          const cls: CellClass = totalKey === 'cashOh' ? { category: 'cashOverhead', confidence: 'column' } : totalKey === 'noncash' ? { category: 'nonCashOverhead', confidence: 'column' } : rowCategory(r.label, r.section);
+          row.cells[c.key] = cellFrom(original, cls, F(cls));
+          return;
+        }
         row.cells[c.key] = deltaTotal(original, before, after);
         const residual = original == null ? 0 : original - before;
         if (residual) row.cells[c.key].note = `Printed total differs from its parsed components by $${residual.toLocaleString('en-US')}; this difference is retained without indexing.`;
@@ -795,8 +896,16 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
     });
     if (totalKey) totals.set(totalKey, row);
     if (kind === 'operation' || kind === 'overheadItem' || kind === 'interest') { details.push(row); sectionDetails.push(row); }
+    else sectionDetails = []; // a total, income, net or accumulated line closes the lines above it
     rows.push(row);
   });
+  // Where the study's own figures disagree, say so; the rows show the figures computed from the study's costs and income.
+  const where = (i: number) => `${est.rows[i].label} (page ${est.rows[i].page})`;
+  for (const [i, m] of incomeMisses) notes.add(`${where(i)}: the study prints another income than the year's income from production (${m.join('; ')}); its net rows use the year's income.`);
+  for (const [i, m] of netMisses) {
+    const n = nets.get(i)!;
+    notes.add(`${where(i)}: the printed figure is not ${n.profit ? `income less ${n.basis} costs` : `${n.basis} costs less income`} (${m.join('; ')}); the computed figure is shown.`);
+  }
   const estTotal = establishmentSummaryOf(study).total;
   const noCharge = noChargeReason(establishmentSummaryOf(study));
   const establishmentNote = [estTotal && `Establishment cost total: ${dollars(estTotal.value)} per acre in the study, ${establishmentSource(estTotal)}.`, noCharge && `${noCharge} No yearly establishment charge is included.`].filter(Boolean).join(' ') || null;

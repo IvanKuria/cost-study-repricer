@@ -1116,20 +1116,6 @@
    ],
    "rows": [
     {
-     "label": "Total Tons Per Acre:",
-     "kind": "operation",
-     "section": "",
-     "values": [
-      null,
-      null,
-      null,
-      0.5,
-      1.2
-     ],
-     "page": 12,
-     "quote": "Total Tons Per Acre: 0.5 1.2"
-    },
-    {
      "label": "Domestic Fresh (18 lb boxes):",
      "kind": "operation",
      "section": "",
@@ -1802,20 +1788,6 @@
      "quote": "TOTAL OPERATING COSTS/ACRE 2,943 820 890 3,897 4,598"
     },
     {
-     "label": "Total Tons Per Acre:",
-     "kind": "operation",
-     "section": "Harvest & Assessment Costs",
-     "values": [
-      null,
-      null,
-      null,
-      0.5,
-      1.2
-     ],
-     "page": 13,
-     "quote": "Total Tons Per Acre: 0.5 1.2"
-    },
-    {
      "label": "Domestic Fresh (18 lb boxes):",
      "kind": "operation",
      "section": "Harvest & Assessment Costs",
@@ -2407,7 +2379,9 @@
   ],
   "warnings": [
    "Table 2 lists 3 return lines with different prices; pricePerUnit left null, see returns[]",
-   "Table 1 prints one combined fuel, lube and repairs column; it is stored under fuel with lubeRepairs null"
+   "Table 1 prints one combined fuel, lube and repairs column; it is stored under fuel with lubeRepairs null",
+   "establishment table: Total Tons Per Acre: (page 12) is a yield line, not a cost; left out of the table",
+   "establishment table: Total Tons Per Acre: (page 13) is a yield line, not a cost; left out of the table"
   ]
  }
 }

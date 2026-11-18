@@ -2083,7 +2083,7 @@
      "section": "Cash Overhead Costs",
      "values": [
       6155,
-      9.278,
+      9278,
       0
      ],
      "page": 15,
@@ -2251,7 +2251,7 @@
      "section": "Non-Cash Overhead Cost",
      "values": [
       7575,
-      10.711,
+      10711,
       1548
      ],
      "page": 15,
@@ -2283,7 +2283,7 @@
     }
    ],
    "yieldRow": {
-    "label": "s: $19/Box, Boxes Per Acre:",
+    "label": "Boxes Per Acre @ $19/box",
     "values": [
      0,
      0,
@@ -2308,7 +2308,7 @@
     "label": "2nd",
     "totalCost": 9278,
     "returns": 0,
-    "netCost": 9.278,
+    "netCost": 9278,
     "accumulated": 15433,
     "page": 15,
     "quote": "ACCUMULATED NET CASH COSTS/ACRE 6,155 15,433 15,427"
@@ -2434,6 +2434,8 @@
    "establishmentAccumulated"
   ],
   "warnings": [
+   "establishment table: NET CASH COSTS/ACRE FOR THE YEAR column 2nd prints 9.278 with a period for the thousands comma; read as 9278 (page 15)",
+   "establishment table: NET COST/ACRE FOR THE YEAR column 2nd prints 10.711 with a period for the thousands comma; read as 10711 (page 15)",
    "establishment year 2: running net 6164.278 differs from printed accumulated 15433"
   ]
  }

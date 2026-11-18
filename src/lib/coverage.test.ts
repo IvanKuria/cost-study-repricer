@@ -107,9 +107,10 @@ describe('golden studies, repriced to July 2026 at 7.51%', () => {
     expect(r.sourceNote).toContain(words);
     expect(r.sourceNote).toContain(`CRF(7.51%, interest rate in use, ${years} years)`);
   });
-  it('almonds 2024 Sacramento Valley: $15,714 x CRF(7.51%, 22) = $1,481 in both tables', () => {
-    expect(charge('almonds-2024sacvalleyalmonds7-5-24-final-draft').cells.total.repriced).toBeCloseTo(1481.25, 0);
+  // Year 3 accumulated net cash cost: 11,311 + 1,900 + 2,591 = 15,802 (cash overhead follows its eight lines, 463 -> 492).
+  it('almonds 2024 Sacramento Valley: $15,802 x CRF(7.51%, 22) = $1,490 in both tables', () => {
+    expect(charge('almonds-2024sacvalleyalmonds7-5-24-final-draft').cells.total.repriced).toBeCloseTo(1489.52, 0);
     const est = repriceStudy(load('almonds-2024sacvalleyalmonds7-5-24-final-draft'), TODAY);
-    expect(est.rows.find(r => /^Establishment Costs/.test(r.label))!.cells.y4.repriced).toBeCloseTo(1481, 0);
+    expect(est.rows.find(r => /^Establishment Costs/.test(r.label))!.cells.y4.repriced).toBeCloseTo(1489.52, 0);
   });
 });

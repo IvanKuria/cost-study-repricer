@@ -1114,21 +1114,6 @@
    ],
    "rows": [
     {
-     "label": "Total Yield: Dry, In-Shell Pounds Per Acre:",
-     "kind": "operation",
-     "section": "",
-     "values": [
-      null,
-      null,
-      null,
-      null,
-      null,
-      600
-     ],
-     "page": 21,
-     "quote": "Total Yield: Dry, In-Shell Pounds Per Acre: 600"
-    },
-    {
      "label": "Pre-Planting",
      "kind": "heading",
      "section": "Pre-Planting",
@@ -1849,21 +1834,6 @@
      "quote": "TOTAL OPERATING COSTS/ACRE 3,469 822 968 1,071 1,394 1,794"
     },
     {
-     "label": "Total Yield: Dry, In-Shell Pounds Per Acre",
-     "kind": "operation",
-     "section": "Harvest",
-     "values": [
-      null,
-      null,
-      null,
-      null,
-      null,
-      600
-     ],
-     "page": 22,
-     "quote": "Total Yield: Dry, In-Shell Pounds Per Acre 600"
-    },
-    {
      "label": "Cash Overhead",
      "kind": "heading",
      "section": "Cash Overhead",
@@ -2481,7 +2451,9 @@
    "landRentPerAcre"
   ],
   "warnings": [
-   "establishment table: TOTAL PLANTING COSTS column 1st prints 1900 but its rows sum to 596"
+   "establishment table: TOTAL PLANTING COSTS column 1st prints 1900 but its rows sum to 596",
+   "establishment table: Total Yield: Dry, In-Shell Pounds Per Acre: (page 21) is a yield line, not a cost; left out of the table",
+   "establishment table: Total Yield: Dry, In-Shell Pounds Per Acre (page 22) is a yield line, not a cost; left out of the table"
   ]
  }
 }

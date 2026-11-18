@@ -10,6 +10,9 @@ const load = (id: string) => JSON.parse(readFileSync(`data/studies/parsed/${id}.
 const almond = load('almonds-2024-almondssjvsouth-final-draft-8-3-25');
 const cell = (table: RepricedTable, label: string, col = 'y1') => table.rows.find(r => r.label === label)!.cells[col];
 const samePeriod = { targetPeriod: '2024-06' };
+/** A net or income row the table notes as disagreeing with the study's own costs and income: it shows the computed figure
+ *  (see summary.test.ts), so it is the one row allowed to differ from print at unchanged prices. */
+const studyError = (t: RepricedTable, r: RepricedTable['rows'][number]) => (r.kind === 'net' || r.kind === 'returns') && (t.notes ?? []).some(n => n.startsWith(`${r.label} (page ${r.page}):`) && /the printed figure is not|prints another income/.test(n));
 const labels = { op: 'TOTAL OPERATING COSTS/ACRE', cash: 'TOTAL CASH COSTS/ACRE', net: 'NET CASH COSTS/ACRE FOR THE YEAR', acc: 'ACCUMULATED NET CASH COSTS/ACRE', total: 'TOTAL COST/ACRE FOR THE YEAR', accTotal: 'TOTAL ACCUMULATED NET COST/ACRE' };
 
 describe('real establishment tables', () => {
@@ -41,7 +44,7 @@ describe('real establishment tables', () => {
     ['walnuts-23walnutssacval-final-3-26-24', '2023-06'],
   ])('preserves every printed value at unchanged prices and interest: %s', (id, period) => {
     const t = repriceStudy(load(id), { targetPeriod: period });
-    for (const row of t.rows) for (const c of Object.values(row.cells)) {
+    for (const row of t.rows.filter(r => !studyError(t, r))) for (const c of Object.values(row.cells)) {
       if (c.original === null) expect(c.repriced, row.label).toBeNull();
       else expect(c.repriced, row.label).toBeCloseTo(c.original, 7);
     }
@@ -144,7 +147,11 @@ describe('real establishment tables', () => {
       const t = repriceStudy(s, { targetPeriod: '2026-07', interestRate: 0.0751 });
       expect(t.rows.length, file).toBe(s.establishment.table.rows.length);
       const unchanged = repriceStudy(s, { targetPeriod: `${s.source.year}-06` });
-      for (const row of unchanged.rows) for (const c of Object.values(row.cells)) expect(c.repriced ?? 0, `${file}: ${row.label}`).toBeCloseTo(c.original ?? 0, 6);
+      // Net rows are income less cost from the study's rounded figures, so they may differ from print by its rounding.
+      for (const row of unchanged.rows.filter(r => !studyError(unchanged, r))) for (const c of Object.values(row.cells)) {
+        if (row.kind === 'net') expect(Math.abs((c.repriced ?? 0) - (c.original ?? 0)), `${file}: ${row.label}`).toBeLessThanOrEqual(2);
+        else expect(c.repriced ?? 0, `${file}: ${row.label}`).toBeCloseTo(c.original ?? 0, 6);
+      }
       for (const r of t.rows) for (const c of Object.values(r.cells)) {
         expect(c.repriced === null || Number.isFinite(c.repriced), `${file}: ${r.label}`).toBe(true);
         if ((s.source.year ?? 0) >= 2010 && ['operation', 'overheadItem'].includes(r.kind) && c.original != null && !c.recalculated) {

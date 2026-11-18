@@ -182,12 +182,17 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
   const hasTime = table.columns.some(c => c.key === 'timeHrs');
   const cols = table.columns.filter(c => c.key !== 'timeHrs');
   const showTime = isProd && !hasTime;
-  const factorColumn = (key: string) => view !== 'study' && (!isProd || key === 'total');
-  const columnCount = 1 + ((showTime || hasTime) ? 1 : 0) + cols.length + cols.filter(c => factorColumn(c.key)).length;
+  // Factor columns double the table's width (one per year in the establishment table), so they open on request.
+  const [showFactors, setShowFactors] = useState(false);
+  const factorColumn = (key: string) => showFactors && view !== 'study' && (!isProd || key === 'total');
+  // On a phone the production table shows the operation and its total; the cost columns open on request.
+  const [allCols, setAllCols] = useState(false);
+  const part = (key: string) => isProd && key !== 'total' && !allCols ? 'hidden md:table-cell' : '';
+  const columnCount = 1 +((showTime || hasTime) ? 1 : 0) + cols.length + cols.filter(c => factorColumn(c.key)).length;
   // The yield and its sale price sit with the income, near the bottom, as the return lines do in mature production.
   const firstIncome = table.yieldRow ? table.rows.find(r => r.kind === 'returns')?.id ?? null : null;
   const yieldRows = table.yieldRow && <>
-    <tr className="border-b border-line text-ink-2 align-top"><td className="py-1 pr-2 md:sticky md:left-0 bg-ground z-10">{salePrice && view !== 'study' ? <YieldPrice label={table.yieldRow.label} sale={salePrice} /> : table.yieldRow.label}</td>{cols.map((c, i) => <Fragment key={c.key}>{factorColumn(c.key) && <td />}<td className="text-right px-2 tnum">{table.yieldRow!.values[i] == null ? '—' : fmt(table.yieldRow!.values[i])}</td></Fragment>)}</tr>
+    <tr className="border-b border-line text-ink-2 align-top"><td className="py-1 pr-2 sticky left-0 bg-ground z-10">{salePrice && view !== 'study' ? <YieldPrice label={table.yieldRow.label} sale={salePrice} /> : table.yieldRow.label}</td>{cols.map((c, i) => <Fragment key={c.key}>{factorColumn(c.key) && <td />}<td className="text-right px-2 tnum">{table.yieldRow!.values[i] == null ? '—' : fmt(table.yieldRow!.values[i])}</td></Fragment>)}</tr>
     {salePrice && view !== 'study' && <tr className="border-b border-line"><td colSpan={columnCount} className="py-1 text-[12px] text-ink-2"><YieldPriceNotes sale={salePrice} /></td></tr>}
   </>;
   // Collapsible sections: each heading owns the rows up to the next heading. Collapsed, a section shows its heading and
@@ -213,17 +218,20 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                 const sec = sections.get(r.id);
                 if (!sec?.details) return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5 font-bold">{r.label}</td></tr>;
                 const open = expanded.has(r.id);
+                // The whole heading row is the button, with the action spelled out, so a section reads as something to open.
                 return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5">
-                  <button type="button" aria-expanded={open} onClick={() => toggle(r.id)} className="font-bold text-left min-h-11 md:min-h-0 hover:text-accent-deep"><span aria-hidden className="inline-block w-4">{open ? '▾' : '▸'}</span>{r.label}</button>
-                  {!open && <span className="ml-2 text-[12px] text-ink-3">{sec.details} {sec.details === 1 ? 'line' : 'lines'}</span>}
-                  {!open && sec.edited && <span className="ml-2 whitespace-nowrap rounded border border-accent bg-accent-soft/40 px-1 text-[11px] text-accent-deep">edited</span>}
+                  <button type="button" aria-expanded={open} onClick={() => toggle(r.id)} className="group sticky left-0 flex w-full max-w-[calc(100vw-5rem)] md:max-w-none items-center gap-2 rounded px-1 -mx-1 text-left min-h-11 md:min-h-8 hover:bg-accent-soft/50">
+                    <span className="font-bold">{r.label}</span>
+                    {sec.edited && <span className="whitespace-nowrap rounded border border-accent bg-accent-soft/40 px-1 text-[11px] text-accent-deep">edited</span>}
+                    <span className="ml-auto whitespace-nowrap rounded-full border border-line px-2.5 py-0.5 text-[12px] text-accent group-hover:border-accent">{open ? 'Hide lines ▴' : `Show ${sec.details} ${sec.details === 1 ? 'line' : 'lines'} ▾`}</span>
+                  </button>
                 </td></tr>;
               }
               const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
               const editable = r.kind === 'operation' || r.kind === 'overheadItem' || r.kind === 'returns' || r.kind === 'interest';
               return (
                 <tr key={r.id} className={cn('align-top', (r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net') && 'border-t border-line-strong', (r.kind === 'total' || r.kind === 'net') && 'font-bold')}>
-                  <td className={cn('py-[3px] pr-2 md:sticky md:left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>
+                  <td className={cn('py-[3px] pr-2 sticky left-0 bg-ground z-10', caps ? 'uppercase' : 'pl-4')}>
                     {view === 'study' ? r.label : r.displayLabel ?? r.label}
                     {usesFallback(r) && <span className="ml-2 whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title="No specific index matched this label, so the consumer price index (CPI) reprices it.">CPI fallback</span>}
                     {r.sourceNote && <span className="block text-[11px] leading-snug text-ink-2">{r.sourceNote}</span>}
@@ -234,14 +242,14 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                     {r.kind === 'returns' && <span className="block text-[11px] leading-snug text-ink-2 normal-case">{returnsHint(r, isProd, view, !!table.yieldRow)}</span>}
                     {r.id === 'gross' && r.kind === 'subtotal' && <span className="block text-[11px] leading-snug text-ink-2 normal-case font-normal">{r.cells.total?.overridden ? r.cells.total.note : 'Sum of the return lines above.'}</span>}
                   </td>
-                  {(showTime || hasTime) && <td className="py-[3px] px-2 text-right tnum">{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
+                  {(showTime || hasTime) && <td className={cn('py-[3px] px-2 text-right tnum', part('timeHrs'))}>{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
                   {cols.map(c => {
                     const cell = r.cells[c.key];
                     const factorable = (r.kind === 'operation' || r.kind === 'overheadItem') && cell?.original != null && cell.original > 0 && cell.factor != null;
                     const key = r.kind === 'returns' && !isProd ? `income:${c.key}` : `${r.id}:${c.key}`;
                     return <Fragment key={c.key}>
                       {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /> : '—'}</td>}
-                      <td className="py-[3px] px-2 text-right">{editable && !factorable && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
+                      <td className={cn('py-[3px] px-2 text-right', part(c.key))}>{editable && (!factorable || !showFactors) && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
                     </Fragment>;
                   })}
                 </tr>
@@ -254,20 +262,21 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
           <div className="text-[13px] text-ink-2">{[study?.region, study?.year].filter(Boolean).join(' - ')}</div>
         </div>
         {!isProd && <p className="mb-2 text-[12px] text-ink-2">Years after planting · USD per acre · — No amount listed in the study{view !== 'study' && ' · Click a cell to edit'}</p>}
-        {view !== 'study' && <p className="mb-1 text-[12px] text-ink-2">Adjustment factor × study cost = adjusted cost. A factor of 1.10 means a 10% increase.</p>}
         {table.establishmentNote && <p className="mb-2 text-[13px] text-ink">{table.establishmentNote}</p>}
         <p className="mb-3 text-[12px] text-ink-2">{fallbackSentence(table)}{table.summary.fallbackRows > 0 && ' Those rows are tagged CPI fallback.'} {table.rows.some(r => r.returnLine?.published) ? 'Returns are not indexed by cost series. Lines marked USDA use the study price times USDA\'s California price ratio (latest year over the study year); the others keep the study price. Change the quantity, price or value of a return line to update it.' : table.rows.some(r => r.returnLine) ? 'Returns are not indexed; change the quantity, price or value of a return line to update it.' : 'Returns are not indexed; type a value in a returns row to update it.'}</p>
-        {collapsible.length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
-          <button type="button" className="h-11 md:h-8 px-3 rounded-full border border-line text-ink-2 hover:border-accent" onClick={() => setExpanded(allOpen ? new Set() : new Set(collapsible))}>{allOpen ? '▴ Collapse all' : '▾ Expand all'}</button>
-          <span className="text-[12px] text-ink-3">{allOpen ? 'Every line is shown.' : 'Totals are shown; open a section with its arrow to see its lines.'}</span>
-        </div>}
+        <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+          {collapsible.length > 0 && <button type="button" className="h-11 md:h-8 px-3 rounded-full border border-line text-ink-2 hover:border-accent" onClick={() => setExpanded(allOpen ? new Set() : new Set(collapsible))}>{allOpen ? 'Hide all lines ▴' : 'Show all lines ▾'}</button>}
+          {view !== 'study' && <button type="button" aria-pressed={showFactors} className={cn('h-11 md:h-8 px-3 rounded-full border', showFactors ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line text-ink-2 hover:border-accent')} onClick={() => setShowFactors(s => !s)}>{showFactors ? 'Hide adjustment factors' : 'Edit adjustment factors'}</button>}
+          {isProd && <button type="button" aria-pressed={allCols} className={cn('md:hidden h-11 px-3 rounded-full border', allCols ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line text-ink-2')} onClick={() => setAllCols(s => !s)}>{allCols ? 'Totals only' : 'Labor, fuel and material columns'}</button>}
+          <span className="text-[12px] text-ink-3">{showFactors && view !== 'study' ? 'Adjustment factor × study cost = adjusted cost; 1.10 means a 10% increase.' : allOpen ? 'Every line is shown.' : 'Totals are shown. Open a section to see and edit its lines.'}</span>
+        </div>
         <div className="overflow-x-auto -mx-1 px-1" role="region" aria-label="Cost table" tabIndex={0}>
-        <table className="w-full min-w-[1100px] text-[13px] border-collapse">
+        <table className={cn('w-full text-[13px] border-collapse', showFactors && view !== 'study' && 'min-w-[1100px]')}>
           <thead>
             <tr className="border-b border-ink align-bottom">
-              <th className="text-left font-normal text-ink-2 py-1 pr-2 md:sticky md:left-0 bg-ground z-10 min-w-[180px]">Operation</th>
-              {(showTime || hasTime) && <th className="text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line">{'Time\n(Hrs/A)'}</th>}
-              {cols.map(c => <Fragment key={c.key}>{factorColumn(c.key) && <th className="text-right font-normal text-ink-2 py-1 px-2">{!isProd && `Year ${c.label.match(/\d+/)?.[0] ?? c.label} `}Adjustment factor</th>}<th className="text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line">{isProd ? c.label.replace(' & ', ' &\n').replace('/ ', '/\n') : `Year ${c.label.match(/\d+/)?.[0] ?? c.label}`}</th></Fragment>)}
+              <th className="text-left font-normal text-ink-2 py-1 pr-2 sticky left-0 bg-ground z-10 min-w-[140px] md:min-w-[180px]">Operation</th>
+              {(showTime || hasTime) && <th className={cn('text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line', part('timeHrs'))}>{'Time\n(Hrs/A)'}</th>}
+              {cols.map(c => <Fragment key={c.key}>{factorColumn(c.key) && <th className="text-right font-normal text-ink-2 py-1 px-2">{!isProd && `Year ${c.label.match(/\d+/)?.[0] ?? c.label} `}Adjustment factor</th>}<th className={cn('text-right font-normal text-ink-2 py-1 px-2 whitespace-pre-line', part(c.key))}>{isProd ? c.label.replace(' & ', ' &\n').replace('/ ', '/\n') : `Year ${c.label.match(/\d+/)?.[0] ?? c.label}`}</th></Fragment>)}
             </tr>
           </thead>
           <tbody>

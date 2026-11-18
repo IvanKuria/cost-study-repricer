@@ -2177,7 +2177,7 @@
     },
     {
      "label": "TOTAL CAPITAL RECOVERY",
-     "kind": "overheadItem",
+     "kind": "subtotal",
      "section": "Cash Overhead Costs",
      "values": [
       1499,

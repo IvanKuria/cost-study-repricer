@@ -999,21 +999,6 @@
    ],
    "rows": [
     {
-     "label": "Total Yield: Dry, In-Shell Pounds Per Acre",
-     "kind": "operation",
-     "section": "",
-     "values": [
-      null,
-      null,
-      null,
-      null,
-      null,
-      600
-     ],
-     "page": 15,
-     "quote": "Total Yield: Dry, In-Shell Pounds Per Acre 600"
-    },
-    {
      "label": "Land Preparation/Planting Costs",
      "kind": "heading",
      "section": "Land Preparation/Planting Costs",
@@ -1674,21 +1659,6 @@
      "quote": "TOTAL OPERATING COSTS/ACRE 2,716 808 929 1,028 1,331 1,748"
     },
     {
-     "label": "Total Yield: Dry, In-Shell Pounds Per Acre",
-     "kind": "operation",
-     "section": "Harvest",
-     "values": [
-      null,
-      null,
-      null,
-      null,
-      null,
-      600
-     ],
-     "page": 16,
-     "quote": "Total Yield: Dry, In-Shell Pounds Per Acre 600"
-    },
-    {
      "label": "Cash Overhead",
      "kind": "heading",
      "section": "Cash Overhead",
@@ -2295,6 +2265,8 @@
   ],
   "warnings": [
    "monthly table not used: MONTHLY CASH COSTS PER ACRE TO PRODUCE PISTACHIOS: TOTAL CASH COSTS row: months sum to 2905 but the Total column says 3461",
+   "establishment table: Total Yield: Dry, In-Shell Pounds Per Acre (page 15) is a yield line, not a cost; left out of the table",
+   "establishment table: Total Yield: Dry, In-Shell Pounds Per Acre (page 16) is a yield line, not a cost; left out of the table",
    "establishment total: no printed figure names the amortized column; took the last column (6th) of ACCUMULATED NET CASH COSTS/ACRE"
   ]
  }

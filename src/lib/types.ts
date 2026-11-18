@@ -92,7 +92,14 @@ export interface RepricedRow {
   sourceNote?: string | null;     // plain-words source line shown under the label, e.g. where an establishment total was printed
   returnLine?: ReturnLineDetail;  // a production return line (crop or byproduct): its printed and current quantity and price
   labor?: LaborDetail;            // a production operation with printed labor: its labor hours and wage, or its labor dollars when no hours reproduce them
+  totalKey?: EstablishmentTotalKey; // an establishment table total: which one
+  net?: EstablishmentNet;         // an establishment table net row: what it nets
 }
+
+export type EstablishmentTotalKey = 'operating' | 'cashOh' | 'noncash' | 'cash' | 'total';
+/** An establishment net row is the year's income less one cost total, as a profit (income - cost) or a net cost (cost - income).
+ *  `clamped`: the study prints only the positive side (a blank or 0 when the year is the other way, which its paired row shows). */
+export interface EstablishmentNet { basis: 'operating' | 'cash' | 'total'; profit: boolean; clamped: boolean }
 
 /** An operation's labor. 'machine': operator hours (machine time x the study's labor ratio) x the machine wage reproduce
  *  the printed labor; 'general': the time column holds hand-labor hours at the general wage; 'dollars': no hours reproduce

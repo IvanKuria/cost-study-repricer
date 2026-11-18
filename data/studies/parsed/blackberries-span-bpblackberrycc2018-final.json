@@ -635,17 +635,6 @@
    ],
    "rows": [
     {
-     "label": "4.5- Bandejas Libras Por Acre:",
-     "kind": "operation",
-     "section": "",
-     "values": [
-      4000,
-      4000
-     ],
-     "page": 14,
-     "quote": "4.5- Bandejas Libras Por Acre: 4,000 4,000"
-    },
-    {
      "label": "Costos agronómicos",
      "kind": "operation",
      "section": "",
@@ -669,7 +658,7 @@
     },
     {
      "label": "COSTOS AGRONÓMICOS TOTALES",
-     "kind": "operation",
+     "kind": "subtotal",
      "section": "",
      "values": [
       19884,
@@ -834,7 +823,7 @@
     },
     {
      "label": "GANANCIAS / ACRE ANTES DE LOS COSTOS DE EFECTIVO",
-     "kind": "operation",
+     "kind": "net",
      "section": "Pos cosecha",
      "values": [
       null,
@@ -911,7 +900,7 @@
     },
     {
      "label": "GANANCIA NETA / ACRE POR ENCIMA DEL COSTO TOTAL",
-     "kind": "operation",
+     "kind": "net",
      "section": "Gastos generales sin efectivo (costo de recuperación de capital)",
      "values": [
       null,
@@ -1006,7 +995,10 @@
    "Tables 1 and 2 print different overhead totals; using the rows that add up to TOTAL COSTS/ACRE 65597",
    "the text layer drops the decimal point of the Table 1 hours column (\"0 50\"); it is read as 0.50",
    "Table 1 row \"Camioneta\" prints a total of 83 but its cells add to 183; the section subtotal 6140 (page 21) matches the cells, so 183 is used",
-   "no whole-farm equipment table"
+   "no whole-farm equipment table",
+   "establishment table: COSTOS AGRONÓMICOS TOTALES column Establecer prints 19884 but its rows sum to 23884",
+   "establishment table: COSTOS AGRONÓMICOS TOTALES column 1 prints 6140 but its rows sum to 10140",
+   "establishment table: 4.5- Bandejas Libras Por Acre: (page 14) is a yield line, not a cost; left out of the table"
   ]
  }
 }

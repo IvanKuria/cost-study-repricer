@@ -11,7 +11,6 @@ import { CROP_PRICES } from '@/lib/cropPrices';
 import { Card, periodLabel } from '@/ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Controls } from '@/screens/Controls';
-import { Facts } from '@/screens/Facts';
 import { Summary, type YourPriceProps } from '@/screens/Summary';
 import { StudyTable, type View } from '@/screens/StudyTable';
 import { Notes, mappingNotes } from '@/screens/Notes';
@@ -141,7 +140,7 @@ export default function App() {
   };
   const dataDate = series.filter(s => s.frequency === 'monthly').map(s => s.lastPeriod).sort().reverse()[0] ?? null;
 
-  if (new URLSearchParams(window.location.search).get('section') === 'sources' && table && meta) return <main className="mx-auto max-w-4xl p-5"><h1 className="text-2xl font-bold mb-4">Sources and calculations</h1><p className="mb-4">Adjustment factor = selected month’s index ÷ study-period index. Adjusted cost = study cost × factor. Automatic production totals combine the adjusted components.</p><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} /></main>;
+  if (new URLSearchParams(window.location.search).get('section') === 'sources' && table && meta) return <main className="mx-auto max-w-4xl p-5"><h1 className="text-2xl font-bold mb-4">Sources and calculations</h1><p className="mb-4">Adjustment factor = selected month’s index ÷ study-period index. Adjusted cost = study cost × factor. Automatic production totals combine the adjusted components.</p><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} sourcesOpen /></main>;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -173,7 +172,7 @@ export default function App() {
                 <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { setLayout(l); setOverrides({}); setFactorOverrides({}); }} className={`h-9 px-4 rounded-full border ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
                 <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}</p>
               </div>}
-              <Card className="p-5 space-y-4"><Summary table={table} acres={hash.acres} price={yourPrice} /><Facts table={table} acres={hash.acres} /></Card>
+              <Card className="p-5 space-y-4"><Summary table={table} acres={hash.acres} price={yourPrice} /></Card>
               <Card className="p-5 space-y-4">
                 <div className="flex flex-wrap items-center gap-2 text-[13px]">
                   <span className="text-ink-2 mr-1">Show</span>

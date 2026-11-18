@@ -14,14 +14,16 @@ export function mappingNotes(mapping: CategoryMapping[], series: Series[]) {
   return mapping.map(m => ({ label: CATEGORY_LABEL[m.category] ?? m.category, series: series.find(s => s.id === m.seriesId)?.name ?? m.seriesId, note: m.note }));
 }
 
-export function Notes({ table, meta, study, mapping, series }: { table: RepricedTable; meta: ExportMeta; study: StudyPick | null; mapping: CategoryMapping[]; series: Series[] }) {
+/** `sourcesOpen` opens every section on the printable sources page, which exists to show them. */
+export function Notes({ table, meta, study, mapping, series, sourcesOpen = false }: { table: RepricedTable; meta: ExportMeta; study: StudyPick | null; mapping: CategoryMapping[]; series: Series[]; sourcesOpen?: boolean }) {
+  const prices = priceSourceLines(table);
   const shares = new Map<string, number>();
   for (const c of table.summary.coverage) shares.set(c.category, (shares.get(c.category) ?? 0) + c.share);
   return (
     <div className="space-y-4 text-[14px] leading-relaxed max-w-[86ch]">
       <p>{repricingSentence(table, meta)}</p>
-      {!!table.notes?.length && <Collapsible><CollapsibleTrigger className="font-medium text-accent underline underline-offset-2">Calculation notes and study discrepancies ({table.notes.length})</CollapsibleTrigger><CollapsibleContent><ul className="list-disc pl-5 space-y-2 mt-2">{table.notes.map(n => <li key={n}>{n}</li>)}</ul></CollapsibleContent></Collapsible>}
-      <Collapsible>
+      {!!table.notes?.length && <Collapsible defaultOpen={sourcesOpen}><CollapsibleTrigger className="font-medium text-accent underline underline-offset-2">Calculation notes and study discrepancies ({table.notes.length})</CollapsibleTrigger><CollapsibleContent><ul className="list-disc pl-5 space-y-2 mt-2">{table.notes.map(n => <li key={n}>{n}</li>)}</ul></CollapsibleContent></Collapsible>}
+      <Collapsible defaultOpen={sourcesOpen}>
         <CollapsibleTrigger className="font-medium text-accent underline underline-offset-2">How each line was repriced</CollapsibleTrigger>
         <CollapsibleContent>
           <div className="overflow-x-auto"><table className="mt-2 w-full text-[13px]">
@@ -39,14 +41,16 @@ export function Notes({ table, meta, study, mapping, series }: { table: Repriced
           </table></div>
         </CollapsibleContent>
       </Collapsible>
-      <div>
-        <div className="font-medium mb-1">Sources</div>
-        <ul className="space-y-1 text-[13px] text-ink-2">
-          {study && <li>Source study: UC Davis, {study.title}, {study.region}, {study.year}. <a className="text-accent underline underline-offset-2" href={study.url} target="_blank" rel="noreferrer">PDF</a></li>}
-          {series.map(s => <li key={s.id}>{s.name}: {s.source}, {s.unit}, latest {periodLabel(s.lastPeriod)}.{s.url && <> <a className="text-accent underline underline-offset-2" href={s.url} target="_blank" rel="noreferrer">source</a></>}</li>)}
-          {priceSourceLines(table).map(t => <li key={t.text}>{t.text} <a className="text-accent underline underline-offset-2" href={t.url} target="_blank" rel="noreferrer">source</a></li>)}
-        </ul>
-      </div>
+      <Collapsible defaultOpen={sourcesOpen}>
+        <CollapsibleTrigger className="font-medium text-accent underline underline-offset-2">Sources ({(study ? 1 : 0) + series.length + prices.length})</CollapsibleTrigger>
+        <CollapsibleContent>
+          <ul className="mt-2 space-y-1 text-[13px] text-ink-2">
+            {study && <li>Source study: UC Davis, {study.title}, {study.region}, {study.year}. <a className="text-accent underline underline-offset-2" href={study.url} target="_blank" rel="noreferrer">PDF</a></li>}
+            {series.map(s => <li key={s.id}>{s.name}: {s.source}, {s.unit}, latest {periodLabel(s.lastPeriod)}.{s.url && <> <a className="text-accent underline underline-offset-2" href={s.url} target="_blank" rel="noreferrer">source</a></>}</li>)}
+            {prices.map(t => <li key={t.text}>{t.text} <a className="text-accent underline underline-offset-2" href={t.url} target="_blank" rel="noreferrer">source</a></li>)}
+          </ul>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

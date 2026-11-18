@@ -362,7 +362,7 @@
     },
     {
      "label": "Material Costs Total:",
-     "kind": "operation",
+     "kind": "subtotal",
      "section": "Material",
      "values": [
       6409,
@@ -531,7 +531,7 @@
     },
     {
      "label": "Labor Costs Total:",
-     "kind": "operation",
+     "kind": "subtotal",
      "section": "Labor",
      "values": [
       1904,
@@ -705,8 +705,8 @@
      "values": [
       0,
       0,
-      -2563,
-      -6150
+      2563,
+      6150
      ],
      "page": 10,
      "quote": "LESS INCOME FROM PRODUCTION 0 0 -2,563 -6,150"
@@ -1045,7 +1045,8 @@
   ],
   "warnings": [
    "no costs-per-acre table found",
-   "no whole-farm equipment table"
+   "no whole-farm equipment table",
+   "establishment table: LESS INCOME FROM PRODUCTION prints the income as negatives to subtract; stored as positive income (page 10)"
   ]
  }
 }

@@ -2134,7 +2134,7 @@
       1182,
       1722,
       2020,
-      2.482,
+      2482,
       2830
      ],
      "page": 14,
@@ -2529,9 +2529,9 @@
    {
     "year": 6,
     "label": "6th",
-    "totalCost": 2.482,
+    "totalCost": 2482,
     "returns": 3000,
-    "netCost": -2997.518,
+    "netCost": -518,
     "accumulated": 10077,
     "page": 14,
     "quote": "ACCUMULATED NET CASH COSTS/ACRE 6,535 7,671 8,853 10,075 10,595 10,077 7,907"
@@ -2671,6 +2671,8 @@
    "laborOverheadPct",
    "landRentPerAcre"
   ],
-  "warnings": []
+  "warnings": [
+   "establishment table: TOTAL CASH COSTS/ACRE column 6th prints 2.482 with a period for the thousands comma; read as 2482 (page 14)"
+  ]
  }
 }

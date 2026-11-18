@@ -2382,7 +2382,7 @@
     }
    ],
    "yieldRow": {
-    "label": "s: $17/Box, Boxes Per Acre:",
+    "label": "Boxes Per Acre @ $17/box",
     "values": [
      0,
      0,
