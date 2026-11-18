@@ -37,7 +37,8 @@ function latestRate(series: Series[]): { rate: number; period: string } | null {
 
 export default function App() {
   const picks = useMemo(() => studyPicks(), []);
-  const [hash, setHash] = useState<HashState>(() => window.location.hash ? parseHash(window.location.hash) : { ...DEFAULT_HASH, crop: 'almonds', study: 'almonds-2024-almondssjvsouth-final-draft-8-3-25' });
+  // A plain link opens with no crop chosen, so the visitor picks one (Adauto, 2026-11-18); a shared link restores its own.
+  const [hash, setHash] = useState<HashState>(() => window.location.hash ? parseHash(window.location.hash) : DEFAULT_HASH);
   const [layout, setLayout] = useState<'establishment' | 'production'>('establishment');
   const [price, setPrice] = useState<number | null>(null);
   const series: Series[] = SERIES;
