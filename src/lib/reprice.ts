@@ -1,5 +1,5 @@
 import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, EstablishmentTableRow, OperationRow, ParsedStudy } from '../data/studySchema';
-import type { Category, CategoryMapping, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
+import type { Category, CategoryMapping, LaborDetail, LaborRates, LaborWage, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
 import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
@@ -27,6 +27,62 @@ function yieldUnit(study: ParsedStudy): string | null {
   const before = label.match(/([A-Za-z]+)\s*(?:per|\/)\s*acre/i)?.[1];
   // otherwise the last unit word is the counted thing: "28 Pound Boxes" counts boxes
   return unitWord(before) ?? label.split(/[^A-Za-z]+/).map(unitWord).filter(Boolean).pop() ?? null;
+}
+
+/** Labor edits live in `settings.overrides` too: `op-<index>:laborHours` (operator labor hours per acre) and the study-wide
+ *  wages `wage:machine` and `wage:general` (dollars per hour, overhead included). Labor dollars stay `op-<index>:labor`. */
+export const laborKey = (index: number) => `op-${index}:laborHours`;
+export const isLaborKey = (key: string) => /^op-\d+:laborHours$/.test(key) || key === 'wage:machine' || key === 'wage:general';
+
+/** The study's labor rates in study dollars: machine operator and general wages per labor hour, overhead included, and
+ *  operator hours per machine hour. */
+interface StudyLabor { machine: number; general: number | null; ratio: number; how: LaborRates['how']; overheadPct: number | null; baseMachine: number; baseGeneral: number | null; ratioStated: boolean; matched: number; timed: number }
+/** Printed labor is whole dollars (now and then cents) and time two decimals: a fit is within 50 cents plus 1 percent. */
+const laborFits = (pred: number, printed: number) => Math.abs(pred - printed) <= 0.5 + 0.01 * Math.max(pred, printed);
+/** Which rate reproduces an operation's printed labor from its time column: the machine rate (time x ratio x wage) or the
+ *  general rate (time x wage, the time column holding hand-labor hours). Equipment costs on the row break a tie toward machine. */
+function laborFit(o: OperationRow, perMachineHr: number, general: number | null): 'machine' | 'general' | null {
+  const t = o.timeHrsPerAcre ?? 0, l = o.labor ?? 0;
+  if (!(t > 0) || !(l > 0)) return null;
+  const m = laborFits(t * perMachineHr, l), g = general != null && laborFits(t * general, l);
+  return m && (!g || (o.fuel ?? 0) + (o.lubeRepairs ?? 0) > 0) ? 'machine' : g ? 'general' : null;
+}
+
+/** The wages that reproduce the printed labor: the stated wages (overhead added when the study states it apart), else, when
+ *  the parsed text gives base wages but no overhead, the whole-percent overhead that reproduces the most rows. Null unless
+ *  hours x wage reproduces at least 3 operations and half of those with time and labor: never an unverified wage. */
+function studyLabor(study: ParsedStudy): StudyLabor | null {
+  const { laborMachineRate: wm, laborNonMachineRate: wg, laborOverheadPct: oh } = study.assumptions;
+  if (!(wm?.value && wm.value > 0)) return null;
+  const timed = study.costsPerAcre.operations.filter(o => (o.timeHrsPerAcre ?? 0) > 0 && (o.labor ?? 0) > 0);
+  const stated = study.method.machineLaborFactor?.value;
+  const general = wg?.value && wg.value > 0 ? wg.value : null;
+  const count = (ratio: number, mult: number) => timed.filter(o => laborFit(o, wm.value * ratio * mult, general == null ? null : general * mult)).length;
+  type Try = { n: number; ratio: number; pct: number | null; how: LaborRates['how'] };
+  let best: Try | null = null;
+  // No stated ratio: the UC default 1.2 first, then the other ratios studies use.
+  for (const ratio of stated ? [stated] : [1.2, 1, 1.1, 1.15, 1.25])
+    for (const pct of oh?.value ? [null, oh.value] : [null]) {
+      const n = count(ratio, 1 + (pct ?? 0) / 100);
+      if (!best || n > best.n) best = { n, ratio, pct, how: pct == null ? 'stated' : 'stated overhead' };
+    }
+  const enough = (t: Try | null) => !!t && t.n >= 3 && t.n >= 0.5 * timed.length;
+  if (!enough(best) && stated && !oh?.value) {
+    // The middle of the longest run of percents that reproduce the most rows.
+    const counts = Array.from({ length: 71 }, (_, p) => count(stated, 1 + p / 100));
+    const max = Math.max(...counts);
+    let run: [number, number] = [0, 0];
+    for (let p = 0, len = -1; p <= 70; p++) if (counts[p] === max) { let q = p; while (q < 70 && counts[q + 1] === max) q++; if (q - p > len) { run = [p, q]; len = q - p; } p = q; }
+    if (max > (best?.n ?? 0)) best = { n: max, ratio: stated, pct: Math.round((run[0] + run[1]) / 2), how: 'inferred overhead' };
+  }
+  if (!enough(best)) return null;
+  const mult = 1 + (best!.pct ?? 0) / 100;
+  return { machine: wm.value * mult, general: general == null ? null : general * mult, ratio: best!.ratio, how: best!.how, overheadPct: best!.pct, baseMachine: wm.value, baseGeneral: general, ratioStated: !!stated, matched: best!.n, timed: timed.length };
+}
+
+function laborNote(l: StudyLabor, wageWord: string): string {
+  const base = l.overheadPct == null ? '' : ` (${money2(l.baseMachine)}${l.baseGeneral != null ? ` and ${money2(l.baseGeneral)}` : ''} as stated, plus ${l.overheadPct} percent overhead${l.how === 'inferred overhead' ? ', the overhead that reproduces the cost table; the parsed study text gives no overhead' : ''})`;
+  return `Labor: operator hours x wage reproduces the study's labor on ${l.matched} of ${l.timed} operations with time. Machine operators ${money2(l.machine)} per hour${l.general != null ? `, general labor ${money2(l.general)}` : ''} in the study${base}; operator hours are ${l.ratio} x machine time${l.ratioStated ? '' : ' (the study states no ratio; this one reproduces its labor)'}. ${wageWord}`;
 }
 
 /** The study's main crop line: the first return line whose unit matches the establishment yield unit; the first line when
@@ -292,6 +348,17 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const ops = study.costsPerAcre.operations;
   const opRows: RepricedRow[] = [];
   const bySection = new Map<OperationRow['category'], RepricedRow[]>();
+  // Labor: where operator hours x wage reproduce the printed labor, the lender edits the hours or the wage (indexed by the
+  // labor index unless typed) and the labor cost follows; elsewhere only the labor dollars are editable.
+  const lab = studyLabor(study);
+  const num = (key: string) => { const v = settings.overrides[key]; return v !== undefined && Number.isFinite(v) && v >= 0 ? v : undefined; };
+  const fLabor = F({ category: 'labor', confidence: 'column' }).factor ?? 1;
+  const wage = (key: LaborWage['key'], rate: number, base: number): LaborWage => ({ key, study: rate, indexed: rate * fLabor, current: num(key) ?? rate * fLabor, edited: num(key) !== undefined, base, overheadPct: lab!.overheadPct });
+  const laborRates: LaborRates | null = lab && {
+    machine: wage('wage:machine', lab.machine, lab.baseMachine), general: lab.general != null ? wage('wage:general', lab.general, lab.baseGeneral!) : null,
+    ratio: lab.ratio, how: lab.how, matched: lab.matched, timed: lab.timed,
+    note: laborNote(lab, `Repriced, wages move with the labor index (x ${fLabor.toFixed(3)}); the other operations keep their labor dollars, editable directly.`),
+  };
   ops.forEach((o, i) => {
     const c = classifyRow(o);
     const fuelPart = o.fuel ?? 0, repairPart = o.lubeRepairs ?? 0;
@@ -311,11 +378,27 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     };
     const origTotal = o.totalCost ?? COST_COLS.reduce((s, k) => s + (cells[k].original ?? 0), 0);
     cells.total = plainCell(origTotal, rowTotal(origTotal, cells));
+    const kind = lab ? laborFit(o, lab.machine * lab.ratio, lab.general) : null;
+    const w = kind === 'machine' ? laborRates!.machine : kind === 'general' ? laborRates!.general : null;
+    const hours = w ? o.timeHrsPerAcre! * (kind === 'machine' ? lab!.ratio : 1) : null;
+    const hoursEdit = w ? num(laborKey(i)) : undefined;
+    if (w && hours != null && (hoursEdit !== undefined || w.edited)) {
+      const h = hoursEdit ?? hours, v = h * w.current;
+      cells.labor = { ...cells.labor, repriced: v, factor: v / o.labor!, overridden: true, note: `${h.toLocaleString('en-US', { maximumFractionDigits: 3 })} labor hrs x ${money2(w.current)} per hour${w.edited ? ' (your wage)' : ''} = ${money2(v)}.` };
+    }
     const row: RepricedRow = { id: `op-${i}`, label: o.name, kind: 'operation', section: SECTION_LABEL[o.category], timeHrs: o.timeHrsPerAcre, cells, page: o.page, quote: o.quote };
     for (const col of Object.keys(cells)) applyOverride(row, col, settings);
     if (row.cells.total.overridden === false && COST_COLS.some(k => row.cells[k].overridden)) {
       const repriced = rowTotal(origTotal, row.cells);
       row.cells.total = { ...row.cells.total, repriced, factor: origTotal ? repriced / origTotal : null };
+    }
+    if ((o.labor ?? 0) > 0) {
+      const l = row.cells.labor;
+      row.labor = {
+        kind: kind ?? 'dollars', machineHrs: kind === 'machine' ? o.timeHrsPerAcre : null, ratio: kind === 'machine' ? lab!.ratio : null, wage: w,
+        hours: hours == null ? null : { original: hours, current: hoursEdit ?? hours, edited: hoursEdit !== undefined },
+        dollars: { original: o.labor!, current: l.repriced ?? o.labor!, edited: l.overridden },
+      } satisfies LaborDetail;
     }
     opRows.push(row);
     const list = bySection.get(o.category) ?? []; list.push(row); bySection.set(o.category, list);
@@ -363,6 +446,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const estSummary = establishmentSummaryOf(study);
   const charge = estSummary.annualCharge;
   const notes: string[] = [];
+  if (laborRates && opRows.some(r => r.labor?.dollars.edited)) notes.push(laborRates.note);
   const estTotal = estSummary.total;
   let estTotalRow: RepricedRow | null = null;
   if (estTotal && !hasUsableTable(study)) {
@@ -572,7 +656,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   }
 
   return {
-    studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production',
+    studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production', labor: laborRates,
     columns: [{ key: 'timeHrs', label: 'Time (Hrs/A)' }, ...PROD_COLUMNS],
     rows, referencePeriod: ref, targetPeriod: target, notes, establishmentNote, priceSources, defaultSalePrice: defaultSalePrice(study, settings, target),
     summary: summarize(rows.filter(r => r.section !== 'Establishment'), totalOrig, totalRep, (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0)),

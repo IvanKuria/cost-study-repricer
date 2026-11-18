@@ -91,6 +91,38 @@ export interface RepricedRow {
   quote: string | null;
   sourceNote?: string | null;     // plain-words source line shown under the label, e.g. where an establishment total was printed
   returnLine?: ReturnLineDetail;  // a production return line (crop or byproduct): its printed and current quantity and price
+  labor?: LaborDetail;            // a production operation with printed labor: its labor hours and wage, or its labor dollars when no hours reproduce them
+}
+
+/** An operation's labor. 'machine': operator hours (machine time x the study's labor ratio) x the machine wage reproduce
+ *  the printed labor; 'general': the time column holds hand-labor hours at the general wage; 'dollars': no hours reproduce
+ *  the printed labor (hand labor with no hours, or a mixed operation), so only the labor dollars are editable. */
+export interface LaborDetail {
+  kind: 'machine' | 'general' | 'dollars';
+  hours: { original: number; current: number; edited: boolean } | null; // operator labor hours per acre; null for 'dollars'
+  machineHrs: number | null;      // the time column, for 'machine'
+  ratio: number | null;           // operator hours over machine time, for 'machine'
+  wage: LaborWage | null;         // the wage these hours are paid at; null for 'dollars'
+  dollars: { original: number; current: number; edited: boolean }; // labor cost per acre; edited when hours, wage or the dollars were changed
+}
+
+/** A study-wide labor wage per hour, overhead included, as the cost table uses it. */
+export interface LaborWage {
+  key: 'wage:machine' | 'wage:general';
+  study: number;                  // the rate in study dollars that reproduces the printed labor
+  indexed: number;                // study x the labor index factor
+  current: number;                // the lender's wage, else indexed
+  edited: boolean;
+  base: number;                   // the hourly wage as the study text states it (before overhead when overhead is added)
+  overheadPct: number | null;     // payroll overhead added to the base wage, when it is
+}
+
+/** Labor rates that reproduce the study's printed labor: which wages, how they were found, and how many rows they reproduce. */
+export interface LaborRates {
+  machine: LaborWage; general: LaborWage | null; ratio: number;
+  how: 'stated' | 'stated overhead' | 'inferred overhead';
+  matched: number; timed: number; // operations with time and labor whose labor hours x wage reproduce the printed labor, of all such operations
+  note: string;
 }
 
 /** A return line as the study prints it (quantity, unit, price) and as the lender has it now. The value is in `cells.total`. */
@@ -118,6 +150,8 @@ export interface RepricedTable {
   studyId: string;
   title: string;                  // e.g. 'COSTS PER ACRE TO PRODUCE AND HARVEST ORGANIC STRAWBERRIES' or 'COSTS PER ACRE TO ESTABLISH AN ALMOND ORCHARD'
   layout: 'production' | 'establishment';
+  /** Production table: the labor wages that reproduce the printed labor, with the lender's edits. Null when none do. */
+  labor?: LaborRates | null;
   columns: { key: string; label: string }[];
   rows: RepricedRow[];
   referencePeriod: string;        // 'YYYY-MM'

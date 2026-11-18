@@ -23,4 +23,13 @@ describe('hash state', () => {
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#study=x&ret-0.price=abc&ret-x.price=2&op-1.total=5&ret-2.value=3').returns).toEqual({});
   });
+
+  it('round-trips labor hours and wage edits, and drops mixed or bad keys', () => {
+    const s = { crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-3:laborHours': 1.5, 'wage:machine': 31.25, 'wage:general': 24 } };
+    const h = serializeHash(s);
+    expect(h).toContain('op-3.laborHours=1.5');
+    expect(h).toContain('wage.machine=31.25');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#op-1.price=2&ret-0.laborHours=1&wage.total=3&wage.machine=x&op-x.laborHours=1').returns).toEqual({});
+  });
 });

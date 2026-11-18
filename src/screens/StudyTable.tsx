@@ -5,6 +5,7 @@ import { usesFallback } from '@/lib/reprice';
 import { movedText } from '@/lib/cropPrices';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { FactorSource } from './FactorSource';
+import { LaborEdit } from './LaborEdit';
 import { cn } from '@/lib/utils';
 
 export type View = 'today' | 'study' | 'both';
@@ -74,7 +75,7 @@ function YourCost({ row, col, overrideKey, inline = false, onOverride }: { row: 
 
 /** A quantity or price input on a return line, styled like the inline cost inputs. Typing the default figure back (the
  *  study's, or the USDA-adjusted price when one applies) clears the edit. */
-function LineInput({ id, label, value, original, base, edited, money, onChange }: { id: string; label: string; value: number | null; original: number | null; base?: number | null; edited: boolean; money?: boolean; onChange: (value: number | null) => void }) {
+export function LineInput({ id, label, value, original, base, edited, money, onChange }: { id: string; label: string; value: number | null; original: number | null; base?: number | null; edited: boolean; money?: boolean; onChange: (value: number | null) => void }) {
   const [text, setText] = useState<string | null>(null);
   const show = (n: number | null) => n == null ? '' : n.toLocaleString('en-US', money ? { minimumFractionDigits: 2, maximumFractionDigits: 4 } : { maximumFractionDigits: 4 });
   const reset = base ?? original;
@@ -189,9 +190,35 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
     <tr className="border-b border-line text-ink-2 align-top"><td className="py-1 pr-2 md:sticky md:left-0 bg-ground z-10">{salePrice && view !== 'study' ? <YieldPrice label={table.yieldRow.label} sale={salePrice} /> : table.yieldRow.label}</td>{cols.map((c, i) => <Fragment key={c.key}>{factorColumn(c.key) && <td />}<td className="text-right px-2 tnum">{table.yieldRow!.values[i] == null ? '—' : fmt(table.yieldRow!.values[i])}</td></Fragment>)}</tr>
     {salePrice && view !== 'study' && <tr className="border-b border-line"><td colSpan={columnCount} className="py-1 text-[12px] text-ink-2"><YieldPriceNotes sale={salePrice} /></td></tr>}
   </>;
+  // Collapsible sections: each heading owns the rows up to the next heading. Collapsed, a section shows its heading and
+  // its totals; its detail rows (operations, overhead items, return lines) are hidden. Exports always list every row.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const owner = new Map<string, string>();
+  const sections = new Map<string, { details: number; edited: boolean }>();
+  let head: string | null = null;
+  for (const r of table.rows) {
+    if (r.kind === 'heading') { head = r.id; sections.set(r.id, { details: 0, edited: false }); continue; }
+    if (!head || !isDetail(r)) continue;
+    owner.set(r.id, head);
+    const sec = sections.get(head)!;
+    sec.details++;
+    if (Object.values(r.cells).some(c => c.overridden)) sec.edited = true;
+  }
+  const collapsible = [...sections].filter(([, s]) => s.details > 0).map(([id]) => id);
+  const allOpen = collapsible.every(id => expanded.has(id));
+  const toggle = (id: string) => setExpanded(e => { const n = new Set(e); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const renderRow = (r: RepricedRow) => {
               if (r.kind === 'blank') return <tr key={r.id} className="h-3"><td colSpan={columnCount} /></tr>;
-              if (r.kind === 'heading') return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5 font-bold">{r.label}</td></tr>;
+              if (r.kind === 'heading') {
+                const sec = sections.get(r.id);
+                if (!sec?.details) return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5 font-bold">{r.label}</td></tr>;
+                const open = expanded.has(r.id);
+                return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5">
+                  <button type="button" aria-expanded={open} onClick={() => toggle(r.id)} className="font-bold text-left min-h-11 md:min-h-0 hover:text-accent-deep"><span aria-hidden className="inline-block w-4">{open ? '▾' : '▸'}</span>{r.label}</button>
+                  {!open && <span className="ml-2 text-[12px] text-ink-3">{sec.details} {sec.details === 1 ? 'line' : 'lines'}</span>}
+                  {!open && sec.edited && <span className="ml-2 whitespace-nowrap rounded border border-accent bg-accent-soft/40 px-1 text-[11px] text-accent-deep">edited</span>}
+                </td></tr>;
+              }
               const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
               const editable = r.kind === 'operation' || r.kind === 'overheadItem' || r.kind === 'returns' || r.kind === 'interest';
               return (
@@ -200,6 +227,7 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                     {view === 'study' ? r.label : r.displayLabel ?? r.label}
                     {usesFallback(r) && <span className="ml-2 whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title="No specific index matched this label, so the consumer price index (CPI) reprices it.">CPI fallback</span>}
                     {r.sourceNote && <span className="block text-[11px] leading-snug text-ink-2">{r.sourceNote}</span>}
+                    {r.labor && <LaborEdit row={r} view={view} onOverride={onOverride} />}
                     {r.returnLine && <ReturnLineDetail row={r} view={view} onOverride={onOverride} />}
                     {r.returnLine && view !== 'study' && <PriceSource row={r} />}
                     {r.returnLine && r.page != null && <span className="block text-[11px] leading-snug text-ink-3">{study ? <a className="underline underline-offset-2" href={`${study.url}#page=${r.page}`} target="_blank" rel="noreferrer">Study, page {r.page}</a> : `Study, page ${r.page}`}{r.quote && `: "${r.quote}"`}</span>}
@@ -229,6 +257,10 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
         {view !== 'study' && <p className="mb-1 text-[12px] text-ink-2">Adjustment factor × study cost = adjusted cost. A factor of 1.10 means a 10% increase.</p>}
         {table.establishmentNote && <p className="mb-2 text-[13px] text-ink">{table.establishmentNote}</p>}
         <p className="mb-3 text-[12px] text-ink-2">{fallbackSentence(table)}{table.summary.fallbackRows > 0 && ' Those rows are tagged CPI fallback.'} {table.rows.some(r => r.returnLine?.published) ? 'Returns are not indexed by cost series. Lines marked USDA use the study price times USDA\'s California price ratio (latest year over the study year); the others keep the study price. Change the quantity, price or value of a return line to update it.' : table.rows.some(r => r.returnLine) ? 'Returns are not indexed; change the quantity, price or value of a return line to update it.' : 'Returns are not indexed; type a value in a returns row to update it.'}</p>
+        {collapsible.length > 0 && <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
+          <button type="button" className="h-11 md:h-8 px-3 rounded-full border border-line text-ink-2 hover:border-accent" onClick={() => setExpanded(allOpen ? new Set() : new Set(collapsible))}>{allOpen ? '▴ Collapse all' : '▾ Expand all'}</button>
+          <span className="text-[12px] text-ink-3">{allOpen ? 'Every line is shown.' : 'Totals are shown; open a section with its arrow to see its lines.'}</span>
+        </div>}
         <div className="overflow-x-auto -mx-1 px-1" role="region" aria-label="Cost table" tabIndex={0}>
         <table className="w-full min-w-[1100px] text-[13px] border-collapse">
           <thead>
@@ -240,13 +272,16 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
           </thead>
           <tbody>
             {!firstIncome && yieldRows}
-            {table.rows.map(r => <Fragment key={r.id}>{r.id === firstIncome && yieldRows}{renderRow(r)}</Fragment>)}
+            {table.rows.map(r => <Fragment key={r.id}>{r.id === firstIncome && yieldRows}{(!isDetail(r) || !owner.get(r.id) || expanded.has(owner.get(r.id)!)) && renderRow(r)}</Fragment>)}
           </tbody>
         </table>
       </div>
     </div>
   );
 }
+
+/** Rows a collapsed section hides: its line items. Headings, subtotals, totals, interest, income and net rows stay. */
+const isDetail = (r: RepricedRow) => r.kind === 'operation' || r.kind === 'overheadItem' || (r.kind === 'returns' && !!r.returnLine);
 
 function returnsHint(row: RepricedRow, isProd: boolean, view: View, hasPrice: boolean): string {
   if (row.returnLine) return view === 'study' ? 'Not indexed.' : `${usesUsda(row.returnLine) ? 'Study price x USDA price change' : 'Not indexed'}. Change the quantity or price, or type the value.`;

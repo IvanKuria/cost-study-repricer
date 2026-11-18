@@ -10,11 +10,12 @@ export interface HashState {
   /** Lender edits to gross returns, keyed like the engine's overrides: 'ret-0:price', 'ret-0:quantity', 'ret-0:total', 'gross:total'.
    *  In the URL each is one parameter, e.g. 'ret-0.price=1.75'. They belong to the study and clear when the study changes. */
   returns: Record<string, number>;
+  // Labor edits ride along the same way: 'op-3:laborHours' is 'op-3.laborHours=1.5', 'wage:machine' is 'wage.machine=31.5'.
 }
 
 export const DEFAULT_HASH: HashState = { crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} };
 
-const RETURN_PARAM = /^(ret-\d+|gross)\.(price|quantity|total)$/;
+const RETURN_PARAM = /^(ret-\d+|gross)\.(price|quantity|total)$|^(op-\d+)\.(laborHours)$|^(wage)\.(machine|general)$/;
 
 export function parseHash(hash: string): HashState {
   const q = new URLSearchParams(hash.replace(/^#/, ''));
@@ -25,7 +26,7 @@ export function parseHash(hash: string): HashState {
   const returns: Record<string, number> = {};
   for (const [k, v] of q) {
     const m = k.match(RETURN_PARAM);
-    if (m && v !== '' && Number.isFinite(Number(v))) returns[`${m[1]}:${m[2]}`] = Number(v);
+    if (m && v !== '' && Number.isFinite(Number(v))) returns[k.replace('.', ':')] = Number(v);
   }
   return {
     crop: q.get('crop'),
