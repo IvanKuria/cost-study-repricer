@@ -25,11 +25,21 @@ export function Controls({ value, onChange, picks, periods, rateDefault, rateSou
   rateDefault: number | null; rateSource: string; crRateDefault?: number | null; crRateSource?: string;
   filter: ContentsFilter; onFilterChange: (f: ContentsFilter) => void;
 }) {
-  const setFilter = onFilterChange;
-  // A crop stays listed when it has a study of the chosen kind, or it is the crop already chosen.
-  const commodities = [...new Set(picks.filter(p => matchesFilter(p, filter) || p.commodity === value.crop).map(p => p.commodity))].sort();
+  // Choosing a kind applies it to the selection: a study without that table is cleared, and the crop too when it has
+  // no study of that kind, so what is selected always matches the filter.
+  const setFilter = (f: ContentsFilter) => {
+    onFilterChange(f);
+    if (f === 'any') return;
+    const current = picks.find(p => p.id === value.study);
+    const studyFits = !current || matchesFilter(current, f);
+    const cropFits = !value.crop || picks.some(p => p.commodity === value.crop && matchesFilter(p, f));
+    if (studyFits && cropFits) return;
+    onChange({ ...value, study: studyFits ? value.study : null, crop: cropFits ? value.crop : null, crRate: null });
+  };
+  // Only crops and studies of the chosen kind are listed.
+  const commodities = [...new Set(picks.filter(p => matchesFilter(p, filter)).map(p => p.commodity))].sort();
   const ofCrop = picks.filter(p => !value.crop || p.commodity === value.crop);
-  const studies = ofCrop.filter(p => p.commodity === value.crop && (matchesFilter(p, filter) || p.id === value.study)).sort((a, b) => b.year - a.year || a.region.localeCompare(b.region));
+  const studies = ofCrop.filter(p => p.commodity === value.crop && matchesFilter(p, filter)).sort((a, b) => b.year - a.year || a.region.localeCompare(b.region));
   const rateShown = value.rate ?? rateDefault;
   const showCr = crRateDefault !== null;
   const crShown = value.crRate ?? crRateDefault;
