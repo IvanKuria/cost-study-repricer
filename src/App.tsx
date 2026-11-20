@@ -10,7 +10,7 @@ import { defaultSalePrice, isLaborKey, isReturnKey, mainReturnIndex, repriceStud
 import { CROP_PRICES } from '@/lib/cropPrices';
 import { Card, periodLabel } from '@/ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { Controls } from '@/screens/Controls';
+import { Controls, type ContentsFilter } from '@/screens/Controls';
 import { Summary, type YourPriceProps } from '@/screens/Summary';
 import { StudyTable, type View } from '@/screens/StudyTable';
 import { Notes, mappingNotes } from '@/screens/Notes';
@@ -43,6 +43,7 @@ export default function App() {
   // A plain link opens with no crop chosen, so the visitor picks one (Adauto, 2026-11-18); a shared link restores its own.
   const [hash, setHash] = useState<HashState>(() => window.location.hash ? parseHash(window.location.hash) : DEFAULT_HASH);
   const [layout, setLayout] = useState<'establishment' | 'production'>('establishment');
+  const [filter, setFilter] = useState<ContentsFilter>('any');
   const [price, setPrice] = useState<number | null>(null);
   const series: Series[] = SERIES;
   const [study, setStudy] = useState<ParsedStudy | null>(null);
@@ -100,7 +101,9 @@ export default function App() {
 
   // The layouts this study can show, read from its parsed data. A layout it lacks is never offered or used.
   const contents = study && study.source.id === hash.study ? studyContentsOf(study) : null;
-  const shownLayout: 'establishment' | 'production' = !contents ? layout : layout === 'production' ? (contents.p ? 'production' : 'establishment') : (contents.e ? 'establishment' : 'production');
+  // A filter of one kind fixes the table to that kind; "All" leaves the choice to the layout buttons.
+  const wanted = filter === 'any' ? layout : filter;
+  const shownLayout: 'establishment' | 'production' = !contents ? wanted : wanted === 'production' ? (contents.p ? 'production' : 'establishment') : (contents.e ? 'establishment' : 'production');
   const settings: RepriceSettings | null = target ? {
     layout: shownLayout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides: allOverrides, mapping: DEFAULT_MAPPING, cropPrices: CROP_PRICES,
   } : null;
@@ -218,6 +221,7 @@ export default function App() {
               value={{ crop: hash.crop, study: hash.study, target, rate: hash.rate, crRate: hash.crRate, acres: hash.acres }}
               onChange={v => setHash(h => ({ ...DEFAULT_HASH, ...v, returns: v.study === h.study ? h.returns : {} }))}
               picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource} crRateDefault={crRateDefault} crRateSource={crRateSource}
+              filter={filter} onFilterChange={f => { setFilter(f); if (f !== 'any' && f !== shownLayout) { setOverrides({}); setFactorOverrides({}); } }}
             />
             {table?.layout === 'production' && table.labor && <div className="mt-4 border-t border-line pt-3"><WageInput labor={table.labor} onOverride={editLine} /></div>}
           </Card>
@@ -227,7 +231,7 @@ export default function App() {
             <>
               {/* Only the layouts the study holds are offered; a study with one shows which one it has. */}
               {contents && <div className="max-w-md space-y-2">
-                {contents.e && contents.p
+                {contents.e && contents.p && filter === 'any'
                   ? <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { if (l !== table.layout) { setLayout(l); setOverrides({}); setFactorOverrides({}); } }} className={`h-9 px-4 rounded-full border transition-colors duration-150 ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line hover:border-accent'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
                   : <div className="text-[14px] font-medium">{table.layout === 'establishment' ? 'Planting & early years' : 'Mature production'}</div>}
                 <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}{!(contents.e && contents.p) && ` This study has ${contents.e ? 'no mature production table' : 'no establishment table'}.`}</p>

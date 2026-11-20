@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Field, NumberInput, Select, MONTHS, periodLabel } from '@/ui';
 import type { StudyPick } from '@/lib/types';
 import { CONTENTS_LABEL, type StudyChoice } from '@/lib/studies';
@@ -13,18 +12,20 @@ export function studyLabel(s: StudyPick): string {
   return `${s.region || 'California'} ${s.year}, ${when}`;
 }
 
-/** The study filter: any study, or studies with establishment years, with mature production, or with both. */
-export type ContentsFilter = 'any' | 'establishment' | 'production' | 'both';
+/** The study filter: any study, or only establishment, or only mature production. A chosen kind also fixes which
+ *  table is shown (App), so picking Mature production never shows an establishment table. */
+export type ContentsFilter = 'any' | 'establishment' | 'production';
 const FILTERS: { key: ContentsFilter; label: string }[] = [
-  { key: 'any', label: 'All' }, { key: 'establishment', label: 'Establishment' }, { key: 'production', label: 'Mature production' }, { key: 'both', label: 'Both' },
+  { key: 'any', label: 'All' }, { key: 'establishment', label: 'Establishment' }, { key: 'production', label: 'Mature production' },
 ];
-export const matchesFilter = (s: StudyChoice, f: ContentsFilter) => f === 'any' || (f === 'establishment' ? s.hasEstablishment : f === 'production' ? s.hasProduction : s.contents === 'both');
+export const matchesFilter = (s: StudyChoice, f: ContentsFilter) => f === 'any' || (f === 'establishment' ? s.hasEstablishment : s.hasProduction);
 
-export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, crRateDefault = null, crRateSource = '' }: {
+export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, crRateDefault = null, crRateSource = '', filter, onFilterChange }: {
   value: ControlsValue; onChange: (v: ControlsValue) => void; picks: StudyChoice[]; periods: string[];
   rateDefault: number | null; rateSource: string; crRateDefault?: number | null; crRateSource?: string;
+  filter: ContentsFilter; onFilterChange: (f: ContentsFilter) => void;
 }) {
-  const [filter, setFilter] = useState<ContentsFilter>('any');
+  const setFilter = onFilterChange;
   // A crop stays listed when it has a study of the chosen kind, or it is the crop already chosen.
   const commodities = [...new Set(picks.filter(p => matchesFilter(p, filter) || p.commodity === value.crop).map(p => p.commodity))].sort();
   const ofCrop = picks.filter(p => !value.crop || p.commodity === value.crop);
