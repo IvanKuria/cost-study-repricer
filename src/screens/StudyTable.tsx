@@ -184,7 +184,10 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
   const showTime = isProd && !hasTime;
   // Factor columns double the table's width (one per year in the establishment table), so they open on request.
   const [showFactors, setShowFactors] = useState(false);
-  const factorColumn = (key: string) => showFactors && view !== 'study' && (!isProd || key === 'total');
+  // Production edits a factor per cost item (labor, fuel, materials, custom) inside each cell, so it has no factor column;
+  // the establishment table keeps one factor column per year.
+  const factorColumn = (_key: string) => showFactors && view !== 'study' && !isProd;
+  const cellFactor = (key: string) => showFactors && view !== 'study' && isProd && key !== 'total';
   // On a phone the production table shows the operation and its total; the cost columns open on request.
   const [allCols, setAllCols] = useState(false);
   const part = (key: string) => isProd && key !== 'total' && !allCols ? 'hidden md:table-cell' : '';
@@ -249,7 +252,9 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                     const key = r.kind === 'returns' && !isProd ? `income:${c.key}` : `${r.id}:${c.key}`;
                     return <Fragment key={c.key}>
                       {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /> : '—'}</td>}
-                      <td className={cn('py-[3px] px-2 text-right', part(c.key))}>{editable && (!factorable || !showFactors) && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
+                      <td className={cn('py-[3px] px-2 text-right', part(c.key))}>{cellFactor(c.key) && factorable
+                        ? <div className="flex flex-col items-end gap-1"><CellValue cell={cell} view={view} series={series} /><FactorInput compact cell={cell} label={`${r.label}, ${c.label}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /></div>
+                        : editable && (!factorable || !showFactors) && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
                     </Fragment>;
                   })}
                 </tr>
@@ -300,11 +305,12 @@ function returnsHint(row: RepricedRow, isProd: boolean, view: View, hasPrice: bo
   return hasPrice ? 'Each year\'s yield x the sale price per unit above. Type a value in any year, or change the price.' : 'Not indexed. Type a value in any year to update.';
 }
 
-function FactorInput({ cell, label, source, onChange }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void }) {
+/** `compact` is the per-cost-item version inside a production cell: a smaller input under the dollar figure. */
+function FactorInput({ cell, label, source, onChange, compact = false }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void; compact?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
-  return <div className="flex min-w-[140px] flex-wrap items-center justify-end gap-2">
+  return <div className={cn('flex items-center justify-end', compact ? 'flex-nowrap gap-1 whitespace-nowrap' : 'flex-wrap min-w-[140px] gap-2')}>
     <input aria-label={`Adjustment factor for ${label}`} type="number" min="0" step="0.01" inputMode="decimal"
-      className="w-[78px] h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] md:text-[13px] tnum"
+      className={cn('h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] tnum', compact ? 'w-[68px] md:h-6 md:text-[12px]' : 'w-[78px] md:text-[13px]', cell.factorOverridden && 'border-accent bg-accent-soft/40')}
       value={draft ?? (cell.factor ?? 1).toFixed(4)}
       onChange={e => setDraft(e.target.value)}
       onBlur={() => { if (draft !== null) { const n = Number(draft); if (draft === '') onChange(null); else if (Number.isFinite(n) && n >= 0 && draft !== (cell.factor ?? 1).toFixed(4)) onChange(n); setDraft(null); } }}
