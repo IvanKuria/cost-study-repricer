@@ -5,6 +5,7 @@ import { Card as ShadCard } from '@/components/ui/card';
 import { Input as ShadInput } from '@/components/ui/input';
 import { Select as ShadSelect, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Select as SelectPrimitive } from 'radix-ui';
 
 // Thin wrappers over shadcn/ui, the same primitives the farmer app uses, sized for a laptop.
 
@@ -83,7 +84,8 @@ export function NumberInput({ value, onChange, step, plain, min = 0, onFocus, on
     }} />;
 }
 
-export interface SelectOption { value: string; label: ReactNode; group?: string }
+/** `detail` is a quieter second line shown in the open list only; the closed select shows the label alone. */
+export interface SelectOption { value: string; label: ReactNode; detail?: ReactNode; group?: string }
 
 /** Select built on shadcn/Radix with optional grouping. */
 export function Select({ value, onChange, options, className, placeholder, id, 'aria-label': ariaLabel, disabled }: {
@@ -100,12 +102,25 @@ export function Select({ value, onChange, options, className, placeholder, id, '
         {[...groups.entries()].map(([g, items]) => (
           <SelectGroup key={g ?? '_'}>
             {g && <SelectLabel className="text-[12px] text-ink-3">{g}</SelectLabel>}
-            {items.map(o => <SelectItem key={o.value} value={o.value} className="text-[15px] py-2">{o.label}</SelectItem>)}
+            {items.map(o => o.detail
+              ? <SelectPrimitive.Item key={o.value} value={o.value} className="relative flex w-full cursor-default flex-col items-start rounded-md py-2 pr-8 pl-1.5 outline-hidden select-none focus:bg-accent-soft data-[state=checked]:font-medium">
+                <SelectPrimitive.ItemText><span className="text-[15px] text-ink">{o.label}</span></SelectPrimitive.ItemText>
+                <span className="text-[12px] text-ink-3 leading-snug">{o.detail}</span>
+              </SelectPrimitive.Item>
+              : <SelectItem key={o.value} value={o.value} className="text-[15px] py-2">{o.label}</SelectItem>)}
           </SelectGroup>
         ))}
       </SelectContent>
     </ShadSelect>
   );
+}
+
+/** The one edited style, used by every value or input the lender changed: a light accent tint, semibold figures, and an
+ *  accent border on inputs. Pair it with <EditedMark /> beside the figure. */
+export const EDITED = 'border-accent/60 bg-accent-soft/70 font-semibold';
+/** The small dot beside an edited figure. Screen readers get the word from the input's or cell's own label. */
+export function EditedMark({ className }: { className?: string }) {
+  return <span aria-hidden className={cn('inline-block size-[5px] shrink-0 rounded-full bg-accent', className)} />;
 }
 
 /** Whole dollars with a real minus sign, the way the study tables print them (no dollar sign inside a table). */

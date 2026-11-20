@@ -1,5 +1,8 @@
-import { Button, Field, NumberInput, Select, MONTHS, periodLabel } from '@/ui';
+import { useState } from 'react';
+import { Field, NumberInput, Select, MONTHS, periodLabel } from '@/ui';
 import type { StudyPick } from '@/lib/types';
+import { CONTENTS_LABEL, type StudyChoice } from '@/lib/studies';
+import { cn } from '@/lib/utils';
 
 export interface ControlsValue { crop: string | null; study: string | null; target: string | null; rate: number | null; crRate: number | null; acres: number }
 
@@ -10,12 +13,22 @@ export function studyLabel(s: StudyPick): string {
   return `${s.region || 'California'} ${s.year}, ${when}`;
 }
 
-export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, crRateDefault = null, crRateSource = '', hasEdits, onResetEdits }: {
-  value: ControlsValue; onChange: (v: ControlsValue) => void; picks: StudyPick[]; periods: string[];
-  rateDefault: number | null; rateSource: string; crRateDefault?: number | null; crRateSource?: string; hasEdits: boolean; onResetEdits: () => void;
+/** The study filter: any study, or studies with establishment years, with mature production, or with both. */
+export type ContentsFilter = 'any' | 'establishment' | 'production' | 'both';
+const FILTERS: { key: ContentsFilter; label: string }[] = [
+  { key: 'any', label: 'All' }, { key: 'establishment', label: 'Establishment' }, { key: 'production', label: 'Mature production' }, { key: 'both', label: 'Both' },
+];
+export const matchesFilter = (s: StudyChoice, f: ContentsFilter) => f === 'any' || (f === 'establishment' ? s.hasEstablishment : f === 'production' ? s.hasProduction : s.contents === 'both');
+
+export function Controls({ value, onChange, picks, periods, rateDefault, rateSource, crRateDefault = null, crRateSource = '' }: {
+  value: ControlsValue; onChange: (v: ControlsValue) => void; picks: StudyChoice[]; periods: string[];
+  rateDefault: number | null; rateSource: string; crRateDefault?: number | null; crRateSource?: string;
 }) {
-  const commodities = [...new Set(picks.map(p => p.commodity))].sort();
-  const studies = picks.filter(p => p.commodity === value.crop).sort((a, b) => b.year - a.year || a.region.localeCompare(b.region));
+  const [filter, setFilter] = useState<ContentsFilter>('any');
+  // A crop stays listed when it has a study of the chosen kind, or it is the crop already chosen.
+  const commodities = [...new Set(picks.filter(p => matchesFilter(p, filter) || p.commodity === value.crop).map(p => p.commodity))].sort();
+  const ofCrop = picks.filter(p => !value.crop || p.commodity === value.crop);
+  const studies = ofCrop.filter(p => p.commodity === value.crop && (matchesFilter(p, filter) || p.id === value.study)).sort((a, b) => b.year - a.year || a.region.localeCompare(b.region));
   const rateShown = value.rate ?? rateDefault;
   const showCr = crRateDefault !== null;
   const crShown = value.crRate ?? crRateDefault;
@@ -25,11 +38,23 @@ export function Controls({ value, onChange, picks, periods, rateDefault, rateSou
         <Select id="crop" value={value.crop ?? ''} placeholder="Choose a crop" onChange={crop => onChange({ ...value, crop, study: null, crRate: null })}
           options={commodities.map(c => ({ value: c, label: title(c) }))} />
       </Field>
-      <Field label="Study">
-        <Select id="study" value={value.study ?? ''} placeholder={value.crop ? 'Choose a study' : 'Pick a crop first'} disabled={!value.crop}
-          onChange={study => onChange({ ...value, study, crRate: null })}
-          options={studies.map(s => ({ value: s.id, label: `${studyLabel(s)}${s.description ? `. ${s.description}` : ''}` }))} />
-      </Field>
+      <div className="min-w-0">
+        <Field label="Study">
+          <Select id="study" value={value.study ?? ''} placeholder={value.crop ? (studies.length ? 'Choose a study' : 'No study of this kind') : 'Pick a crop first'} disabled={!value.crop || !studies.length}
+            onChange={study => onChange({ ...value, study, crRate: null })}
+            options={studies.map(s => ({ value: s.id, label: `${studyLabel(s)}${s.description ? `. ${s.description}` : ''}`, detail: CONTENTS_LABEL[s.contents] }))} />
+        </Field>
+        <div role="group" aria-label="Show studies with" className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+          <span className="text-ink-3 mr-0.5">Studies with</span>
+          {FILTERS.map(f => {
+            const n = ofCrop.filter(p => matchesFilter(p, f.key)).length;
+            return <button key={f.key} type="button" aria-pressed={filter === f.key} disabled={!n && filter !== f.key} onClick={() => setFilter(f.key)}
+              className={cn('min-h-8 md:min-h-6 px-2 rounded-full border transition-colors duration-150 disabled:opacity-40', filter === f.key ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line text-ink-2 hover:border-accent')}>
+              {f.label} <span className="tnum text-ink-3">{n}</span>
+            </button>;
+          })}
+        </div>
+      </div>
       <Field label="Target month">
         <Select id="target" value={value.target ?? ''} placeholder="Latest" onChange={target => onChange({ ...value, target })}
           options={periods.map(p => ({ value: p, label: periodLabel(p) }))} />
@@ -49,7 +74,6 @@ export function Controls({ value, onChange, picks, periods, rateDefault, rateSou
           <NumberInput id="acres" value={value.acres} step={0.1} onChange={n => onChange({ ...value, acres: n && n > 0 ? n : 1 })} />
         </Field>
       </div>
-      {hasEdits && <div className={showCr ? 'lg:col-span-6' : 'lg:col-span-5'}><Button variant="ghost" className="h-9 px-3 text-[14px]" onClick={onResetEdits}>Reset edits</Button></div>}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { EstablishmentSource, EstablishmentSummary, EstablishmentTable, EstablishmentTableRow, OperationRow, ParsedStudy } from '../data/studySchema';
-import type { Category, CategoryMapping, EstablishmentNet, EstablishmentTotalKey, LaborDetail, LaborRates, LaborWage, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
+import type { Category, CategoryMapping, ColumnKeyEntry, EstablishmentNet, EstablishmentTotalKey, LaborDetail, LaborRates, LaborWage, PublishedPrice, RepriceSettings, RepricedCell, RepricedRow, RepricedTable, Series } from './types';
 import { classifyRow, impliedInterest, rowCategory, type CellClass } from './classify';
 import { DEFAULT_MAPPING, REPAIRS_SERIES_ID, SEEDS_SERIES_ID } from '../data/mapping';
 import { SERIES, latestPeriod, periodKey, ratio, seriesById } from './series';
@@ -32,7 +32,9 @@ function yieldUnit(study: ParsedStudy): string | null {
 /** Labor edits live in `settings.overrides` too: `op-<index>:laborHours` (operator labor hours per acre) and the study-wide
  *  wages `wage:machine` and `wage:general` (dollars per hour, overhead included). Labor dollars stay `op-<index>:labor`. */
 export const laborKey = (index: number) => `op-${index}:laborHours`;
-export const isLaborKey = (key: string) => /^op-\d+:laborHours$/.test(key) || key === 'wage:machine' || key === 'wage:general';
+/** Machine time edits: `op-<index>:machineHours` (machine hours per acre, the Time column). They ride with the labor edits. */
+export const machineKey = (index: number) => `op-${index}:machineHours`;
+export const isLaborKey = (key: string) => /^op-\d+:(laborHours|machineHours)$/.test(key) || key === 'wage:machine' || key === 'wage:general';
 
 /** The study's labor rates in study dollars: machine operator and general wages per labor hour, overhead included, and
  *  operator hours per machine hour. */
@@ -154,7 +156,7 @@ const dollars = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 /** Where the study printed its establishment cost, in plain words. */
 export const establishmentSource = (total: NonNullable<EstablishmentSummary['total']>) => `printed in ${SOURCE_WORDS[total.source] ?? 'the study'}, page ${total.page}`;
 export const NO_ESTABLISHMENT_NOTE = 'This study prints no establishment cost we could find; establishment is not included.';
-const ESTABLISHMENT_CPI_NOTE = 'Establishment cost without a usable establishment table is repriced with the CPI (BLS CPI-U, all items), following the professor\'s rule.';
+const ESTABLISHMENT_CPI_NOTE = 'Establishment cost without a usable establishment table is repriced with the CPI (BLS CPI-U, all items).';
 const sentence = (s: string) => { const t = s.trim(); return `${t[0].toUpperCase()}${t.slice(1)}${/[.!?"']$/.test(t) ? '' : '.'}`; };
 /** Why the study charges no yearly establishment cost (it does not amortize it), as the parser states it; null otherwise. */
 const noChargeReason = (e: EstablishmentSummary) => e.status !== 'none' && e.capitalRecovery === null && !e.annualCharge && e.reason?.trim() ? sentence(e.reason) : null;
@@ -220,7 +222,7 @@ function establishmentRecalc(study: ParsedStudy, settings: RepriceSettings, ref:
   if (!cr?.reproduces || !(cr.years.value > 0)) return null;
   const basis = establishmentBasis(study, settings, ref, target, F, totalRow);
   if (!basis) return null;
-  // The adopted rate: the lender's capital recovery rate, else the interest rate in use (the professor's rule), else the study's.
+  // The adopted rate: the lender's capital recovery rate, else the interest rate in use, else the study's.
   const ok = (r: number | null | undefined): r is number => r != null && Number.isFinite(r);
   const rateSource = ok(settings.capitalRecoveryRate) ? 'lender' : ok(settings.interestRate) ? 'interest' : 'study';
   const rate = rateSource === 'lender' ? settings.capitalRecoveryRate! : rateSource === 'interest' ? settings.interestRate! : cr.ratePct.value / 100;
@@ -235,14 +237,15 @@ function recalculatedCharge(r: EstablishmentRecalc): { value: number; note: stri
   return { value, note: `Recalculated: ${dollars(basis)} ${r.basis.words} x CRF(${pct(r.rate)}, ${r.rateSource === 'lender' ? 'lender rate' : r.rateSource === 'interest' ? 'interest rate in use' : 'study rate'}, ${r.years} years) = ${dollars(value)}.${clamp}` };
 }
 
-/** Insurance or property tax on the establishment investment: rate x average investment (basis / 2, salvage 0), or the
- *  study's per-acre amount scaled by the change in the basis when the rate is missing or does not reproduce it. */
+/** Insurance or property tax on the establishment investment: rate x average value, or the study's per-acre amount scaled
+ *  by the change in the basis when the rate is missing or does not reproduce it. The UC studies define average value as
+ *  (new cost + salvage value) / 2; the establishment salvage is 0. */
 function recalculatedInvestmentCharge(r: EstablishmentRecalc, share: number, ratePct: number | null, what: string): { value: number; note: string } | null {
   const basis = Math.max(0, r.basis.repriced);
   const byRate = ratePct != null ? ratePct / 100 * r.basis.original / 2 : null;
   if (ratePct != null && byRate != null && Math.abs(byRate - share) <= Math.max(1, share * 0.02)) {
     const value = ratePct / 100 * basis / 2;
-    return { value, note: `Recalculated: ${pct(ratePct / 100)} ${what} rate x ${dollars(basis)} ${r.basis.words} / 2 average investment = ${dollars(value)}.` };
+    return { value, note: `Recalculated: ${pct(ratePct / 100)} ${what} x average value (${dollars(basis)} cost + $0 salvage) / 2 = ${dollars(value)}; the cost is the ${r.basis.words}.` };
   }
   if (!(r.basis.original > 0)) return null;
   const value = share * basis / r.basis.original;
@@ -252,11 +255,11 @@ function recalculatedInvestmentCharge(r: EstablishmentRecalc, share: number, rat
 const SECTION_LABEL: Record<OperationRow['category'], string> = { cultural: 'Cultural', harvest: 'Harvest', assessment: 'Assessment', postharvest: 'Postharvest', other: 'Other' };
 const round = (n: number | null) => (n == null ? null : Math.round(n));
 
-/** Professor's reference convention: June of the study year, even when its prose names another price month. */
+/** Reference convention: June of the study year, even when its prose names another price month. */
 export function referencePeriod(study: ParsedStudy, settings: RepriceSettings): { period: string; note: string } {
   const year = study.source.year ?? study.source.priceYear?.value ?? study.source.indexYear;
   if (!year) throw new Error('This study has no reference year.');
-  return { period: periodKey(year, settings.referenceMonth), note: `Reference is month ${settings.referenceMonth} of the ${year} study, following the professor's June convention.` };
+  return { period: periodKey(year, settings.referenceMonth), note: `Reference is month ${settings.referenceMonth} of the ${year} study (June of the study year by convention).` };
 }
 
 /** The series and factor for one classified cell. Seeds use the seeds index when present; combined fuel columns use fuels. */
@@ -334,6 +337,7 @@ function applyOverride(row: RepricedRow, col: string, settings: RepriceSettings)
 }
 
 const COST_COLS = ['labor', 'fuelLubeRepairs', 'materials', 'custom'] as const;
+export const MACHINE_NOTE = 'Machine time: fuel, lube and repairs are costs per machine hour (the ASABE method the study uses), so an operation with edited machine hours has its repriced fuel, lube and repairs x your hours / the study\'s hours. Where its labor is machine labor, operator labor hours are your machine hours x the study\'s labor factor, unless you typed the labor hours.';
 /** A row's repriced total, anchored on its printed total: the printed cells are rounded (and now and then a study's row total
  *  disagrees with its own cells), so the cells' repriced sum is scaled by printed total / printed cells. Every factor at 1
  *  gives the printed total back. A row with no cells keeps its total unrepriced. */
@@ -382,12 +386,39 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
     const w = kind === 'machine' ? laborRates!.machine : kind === 'general' ? laborRates!.general : null;
     const hours = w ? o.timeHrsPerAcre! * (kind === 'machine' ? lab!.ratio : 1) : null;
     const hoursEdit = w ? num(laborKey(i)) : undefined;
-    if (w && hours != null && (hoursEdit !== undefined || w.edited)) {
-      const h = hoursEdit ?? hours, v = h * w.current;
-      cells.labor = { ...cells.labor, repriced: v, factor: v / o.labor!, overridden: true, note: `${h.toLocaleString('en-US', { maximumFractionDigits: 3 })} labor hrs x ${money2(w.current)} per hour${w.edited ? ' (your wage)' : ''} = ${money2(v)}.` };
+    // Machine time. The UC studies cost equipment the ASABE way (their "Equipment Operating Costs" section: repairs from
+    // ASABE repair coefficients and hours of use, fuel and lube from ASABE equations), which makes fuel, lube and repairs
+    // costs per machine hour: a row's fuel, lube and repairs scale with its machine hours. Operator labor is machine time x
+    // the study's labor factor (method.machineLaborFactor, e.g. "Labor time for operations involving machinery is 20
+    // percent higher than the equipment time"), so machine labor hours follow too, unless the lender typed the labor
+    // hours. Only a printed machine time on a machine operation is editable: on a hand operation the Time column holds
+    // labor hours, edited as labor.
+    const t = o.timeHrsPerAcre ?? 0;
+    const machineTimed = t > 0 && kind !== 'general' && (fuelPart + repairPart > 0 || kind === 'machine');
+    const mEdit = machineTimed ? num(machineKey(i)) : undefined;
+    const mh = mEdit !== undefined && Math.abs(mEdit - t) > 1e-9 ? mEdit : undefined; // the study's own hours typed back is no edit
+    const derived = kind === 'machine' && mh !== undefined && hoursEdit === undefined ? mh * lab!.ratio : undefined;
+    const laborHours = hoursEdit ?? derived;
+    if (w && hours != null && (laborHours !== undefined || w.edited)) {
+      const h = laborHours ?? hours, v = h * w.current;
+      const fmt = (n: number) => n.toLocaleString('en-US', { maximumFractionDigits: 3 });
+      cells.labor = { ...cells.labor, repriced: v, factor: v / o.labor!, overridden: true, note: `${derived !== undefined ? `${fmt(mh!)} machine hrs x ${lab!.ratio} = ` : ''}${fmt(h)} labor hrs x ${money2(w.current)} per hour${w.edited ? ' (your wage)' : ''} = ${money2(v)}.` };
     }
     const row: RepricedRow = { id: `op-${i}`, label: o.name, kind: 'operation', section: SECTION_LABEL[o.category], timeHrs: o.timeHrsPerAcre, cells, page: o.page, quote: o.quote };
     for (const col of Object.keys(cells)) applyOverride(row, col, settings);
+    if (mh !== undefined) {
+      // Fuel, lube and repairs per acre = the repriced cost per machine hour x the lender's hours: repriced x new / study hours.
+      // A typed fuel, lube and repairs figure wins; a typed factor still sets the price change.
+      const c0 = row.cells.fuelLubeRepairs, s = mh / t;
+      if (c0.original && !(c0.overridden && !c0.factorOverridden)) {
+        const v = (c0.repriced ?? 0) * s;
+        row.cells.fuelLubeRepairs = {
+          ...c0, repriced: v, hoursScale: s, overridden: true,
+          parts: c0.parts?.map(p => ({ ...p, repriced: p.repriced == null ? null : p.repriced * s })),
+          note: `${money2(c0.repriced ?? 0)} at the study's ${t.toLocaleString('en-US', { maximumFractionDigits: 3 })} machine hrs x ${mh.toLocaleString('en-US', { maximumFractionDigits: 3 })} / ${t.toLocaleString('en-US', { maximumFractionDigits: 3 })} hrs = ${money2(v)}.`,
+        };
+      }
+    }
     if (row.cells.total.overridden === false && COST_COLS.some(k => row.cells[k].overridden)) {
       const repriced = rowTotal(origTotal, row.cells);
       row.cells.total = { ...row.cells.total, repriced, factor: origTotal ? repriced / origTotal : null };
@@ -396,10 +427,11 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
       const l = row.cells.labor;
       row.labor = {
         kind: kind ?? 'dollars', machineHrs: kind === 'machine' ? o.timeHrsPerAcre : null, ratio: kind === 'machine' ? lab!.ratio : null, wage: w,
-        hours: hours == null ? null : { original: hours, current: hoursEdit ?? hours, edited: hoursEdit !== undefined },
+        hours: hours == null ? null : { original: hours, current: laborHours ?? hours, edited: hoursEdit !== undefined },
         dollars: { original: o.labor!, current: l.repriced ?? o.labor!, edited: l.overridden },
       } satisfies LaborDetail;
     }
+    if (machineTimed) row.machine = { original: t, current: mh ?? t, edited: mh !== undefined, laborRatio: kind === 'machine' ? lab!.ratio : null };
     opRows.push(row);
     const list = bySection.get(o.category) ?? []; list.push(row); bySection.set(o.category, list);
   });
@@ -439,7 +471,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const totalOperating: RepricedRow = { id: 'total-operating', label: 'TOTAL OPERATING COSTS/ACRE', kind: 'total', section: 'Operating', timeHrs: null, cells: Object.fromEntries(PROD_COLUMNS.map(c => [c.key, c.key === 'total' ? plainCell(opOrig + (interestRow?.cells.total.original ?? 0), opRep + (interestRow?.cells.total.repriced ?? 0)) : sumCells(opRows, c.key)])), page: study.costsPerAcre.operatingTotal?.page ?? null, quote: study.costsPerAcre.operatingTotal?.quote ?? null };
   rows.push(totalOperating);
 
-  // The professor's rule: establishment is repriced with the CPI, not the machinery index. When the study's capital
+  // Establishment is repriced with the CPI, not the machinery index. When the study's capital
   // recovery inputs reproduce its printed yearly charge, that charge and the insurance and taxes on the establishment
   // investment are recalculated from the repriced establishment cost instead.
   const estCls: CellClass = { category: 'establishmentCpi', confidence: 'column' };
@@ -447,6 +479,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   const charge = estSummary.annualCharge;
   const notes: string[] = [];
   if (laborRates && opRows.some(r => r.labor?.dollars.edited)) notes.push(laborRates.note);
+  if (opRows.some(r => r.machine?.edited)) notes.push(MACHINE_NOTE);
   const estTotal = estSummary.total;
   let estTotalRow: RepricedRow | null = null;
   if (estTotal && !hasUsableTable(study)) {
@@ -656,7 +689,7 @@ function productionLayout(study: ParsedStudy, settings: RepriceSettings, ref: st
   }
 
   return {
-    studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production', labor: laborRates,
+    studyId: study.source.id, title: study.costsPerAcre.title ?? study.source.title, layout: 'production', labor: laborRates, columnKey: productionColumnKey(study, lab?.ratio ?? null),
     columns: [{ key: 'timeHrs', label: 'Time (Hrs/A)' }, ...PROD_COLUMNS],
     rows, referencePeriod: ref, targetPeriod: target, notes, establishmentNote, priceSources, defaultSalePrice: defaultSalePrice(study, settings, target),
     summary: summarize(rows.filter(r => r.section !== 'Establishment'), totalOrig, totalRep, (totalOperating.cells.total.repriced ?? 0) + (totalCashOh.cells.total.repriced ?? 0)),
@@ -913,10 +946,40 @@ function establishmentLayout(study: ParsedStudy, est: EstablishmentTable, settin
   const last = cols.find(c => c.key === settings.summaryColumn) ?? cols.at(-1)!;
   const totalRow = totals.get('total') ?? totals.get('cash');
   return {
-    studyId: study.source.id, title: est.title, layout: 'establishment', columns: cols, rows,
+    studyId: study.source.id, title: est.title, layout: 'establishment', columns: cols, rows, columnKey: establishmentColumnKey(study, est),
     referencePeriod: ref, targetPeriod: target, notes: [...notes], establishmentNote, priceSources, defaultSalePrice: defaultSalePrice(study, settings, target), yieldRow: est.yieldRow && { ...est.yieldRow, label: salePrice != null ? est.yieldRow.label.replace(/\$[\d,.]+/, `$${salePrice.toFixed(2)}`) : est.yieldRow.label }, summaryColumn: last.label,
     summary: summarize(details, totalRow?.cells[last.key]?.original ?? null, totalRow?.cells[last.key]?.repriced ?? null, totals.get('cash')?.cells[last.key]?.repriced ?? null),
   };
+}
+
+const quoted = (c: { page: number; quote: string } | null | undefined) => c?.quote ? { page: c.page, quote: c.quote } : null;
+
+/** The production table's key: one line per column, from the study's own sentences where the parsed text has them. The
+ *  Fuel, Lube & Repairs column is machine operating cost only (ASABE repair, fuel and lube formulas); the operator's
+ *  labor is in the Labor column, at machine time x the labor factor x the wage. */
+export function productionColumnKey(study: ParsedStudy, ratio: number | null): ColumnKeyEntry[] {
+  const a = study.assumptions, factor = study.method.machineLaborFactor;
+  const r = ratio ?? factor?.value ?? null;
+  return [
+    { column: 'Time (Hrs/A)', text: 'Machine hours per acre for each machine operation. On a hand operation the figure is labor hours.', source: null },
+    { column: 'Labor Cost', text: `Hired labor at the study's hourly wages.${r ? ` For a machine operation, the operator's hours are the machine time x ${r}.` : ''}`, source: quoted(factor) ?? quoted(a.laborMachineRate) },
+    { column: 'Fuel, Lube & Repairs', text: 'Machine operating cost only: fuel, lubricants and repairs for the equipment, costed per machine hour with the ASABE formulas. The operator is not in this column; that cost is in Labor.', source: quoted(a.fuelPriceDiesel ?? a.fuelPriceGas) },
+    { column: 'Material Cost', text: 'Inputs applied in the operation, such as fertilizer, pesticides, water, bees and trees, at the study\'s prices.', source: null },
+    { column: 'Custom/Rent', text: 'Work hired from a custom operator, whose rate covers their machine, fuel and labor, and rented equipment.', source: null },
+    { column: 'Total Cost', text: 'The row\'s labor, fuel, lube and repairs, materials and custom work together. Interest and overhead lines carry only a total.', source: null },
+  ];
+}
+
+/** The establishment table's key: what the year columns and the kinds of rows hold. */
+export function establishmentColumnKey(study: ParsedStudy, est: EstablishmentTable): ColumnKeyEntry[] {
+  const e = study.establishment;
+  const span = est.years.length > 1 ? `, ${est.years[0]} through ${est.years.at(-1)}` : '';
+  return [
+    { column: 'Year columns', text: `Cost per acre in each year of establishment${span}, counted from planting.`, source: null },
+    { column: 'Operation rows', text: 'Each line is the operation\'s whole cost for the year (labor, machinery, materials and custom work together), repriced with the index for its category.', source: null },
+    ...(est.yieldRow ? [{ column: 'Income', text: 'The year\'s yield per acre x the sale price, in the years the planting bears a crop.', source: null }] : []),
+    { column: 'Net and accumulated rows', text: `Net cost is the year's cost less its income. The accumulated net cost adds the years up${establishmentSummaryOf(study).annualCharge ? '; the study spreads that establishment cost over the production years as a yearly charge in mature production' : ''}.`, source: quoted(e?.accumulatedNetCost) ?? quoted(e?.method) },
+  ];
 }
 
 function summarize(rows: RepricedRow[], totalOrig: number | null, totalRep: number | null, cashRep: number | null): RepricedTable['summary'] {

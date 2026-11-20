@@ -2,7 +2,7 @@
  {
   "id": "nass.fertilizer",
   "name": "FERTILIZER TOTALS, INCL LIME & SOIL CONDITIONERS - INDEX FOR PRICE PAID, 2011",
-  "source": "USDA NASS Quick Stats, Agricultural Prices (professor's export)",
+  "source": "USDA NASS Quick Stats, Agricultural Prices",
   "url": "https://quickstats.nass.usda.gov/",
   "unit": "index, 2011 = 100",
   "frequency": "monthly",
@@ -412,7 +412,7 @@
  {
   "id": "nass.fuels",
   "name": "FUELS - INDEX FOR PRICE PAID, 2011",
-  "source": "USDA NASS Quick Stats, Agricultural Prices (professor's export)",
+  "source": "USDA NASS Quick Stats, Agricultural Prices",
   "url": "https://quickstats.nass.usda.gov/",
   "unit": "index, 2011 = 100",
   "frequency": "monthly",
@@ -822,7 +822,7 @@
  {
   "id": "nass.labor",
   "name": "LABOR, WAGE RATES - INDEX FOR PRICE PAID, 2011",
-  "source": "USDA NASS Quick Stats, Agricultural Prices (professor's export)",
+  "source": "USDA NASS Quick Stats, Agricultural Prices",
   "url": "https://quickstats.nass.usda.gov/",
   "unit": "index, 2011 = 100",
   "frequency": "monthly",
@@ -1232,7 +1232,7 @@
  {
   "id": "nass.chemicals",
   "name": "CHEMICAL TOTALS - INDEX FOR PRICE PAID, 2011",
-  "source": "USDA NASS Quick Stats, Agricultural Prices (professor's export)",
+  "source": "USDA NASS Quick Stats, Agricultural Prices",
   "url": "https://quickstats.nass.usda.gov/",
   "unit": "index, 2011 = 100",
   "frequency": "quarterly",
@@ -1642,7 +1642,7 @@
  {
   "id": "bls.cpi",
   "name": "CPI-U, all items, U.S. city average, seasonally adjusted (CUSR0000SA0)",
-  "source": "U.S. Bureau of Labor Statistics via the professor's Inputs data workbook",
+  "source": "U.S. Bureau of Labor Statistics",
   "url": "https://data.bls.gov/timeseries/CUSR0000SA0",
   "unit": "index, 1982-84 = 100",
   "frequency": "monthly",
@@ -2609,7 +2609,7 @@
  {
   "id": "kcfed.operatingRate",
   "name": "Agricultural interest rate on operating loans, Tenth District, quarterly average",
-  "source": "Federal Reserve Bank of Kansas City, Agricultural Finance Databook, via the professor's Inputs data workbook",
+  "source": "Federal Reserve Bank of Kansas City, Agricultural Finance Databook",
   "url": "https://www.kansascityfed.org/agriculture/agfinance-updates/",
   "unit": "fraction per year",
   "frequency": "quarterly",

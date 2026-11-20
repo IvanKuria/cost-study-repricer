@@ -1,5 +1,5 @@
 /**
- * Builds src/data/series.json from the professor's files (USDA Quick Stats exports, BLS CPI, Kansas
+ * Builds src/data/series.json from the source files (USDA Quick Stats exports, BLS CPI, Kansas
  * City Fed operating loan rate) plus a few Quick Stats series pulled live when NASS_KEY is set in the
  * environment. Nothing is interpolated: a month that is not in a source is not in the output.
  */
@@ -92,27 +92,27 @@ async function main() {
   {
     const rows = parseCsv(readFileSync(qs('Price index- Fertilizer.csv'), 'utf8'));
     const { values, name } = quickStatsToValues(rows, 'INDEX FOR PRICE PAID, 2011');
-    out.push(finish({ id: 'nass.fertilizer', name, source: 'USDA NASS Quick Stats, Agricultural Prices (professor\'s export)', url: 'https://quickstats.nass.usda.gov/', unit: 'index, 2011 = 100', frequency: 'monthly', values }));
+    out.push(finish({ id: 'nass.fertilizer', name, source: 'USDA NASS Quick Stats, Agricultural Prices', url: 'https://quickstats.nass.usda.gov/', unit: 'index, 2011 = 100', frequency: 'monthly', values }));
   }
   for (const [id, file, freq] of [['nass.fuels', 'Price index- Fuel.xlsx', 'monthly'], ['nass.labor', 'Price index- Labor.xlsx', 'monthly'], ['nass.chemicals', 'Price index- Chemicals.xlsx', 'quarterly']] as const) {
     const rows = await sheetRows(qs(file));
     const { values, name, periods } = quickStatsToValues(rows, 'INDEX FOR PRICE PAID, 2011');
     const frequency = periods.size <= 4 ? 'quarterly' : freq;
-    out.push(finish({ id, name, source: 'USDA NASS Quick Stats, Agricultural Prices (professor\'s export)', url: 'https://quickstats.nass.usda.gov/', unit: 'index, 2011 = 100', frequency, values }));
+    out.push(finish({ id, name, source: 'USDA NASS Quick Stats, Agricultural Prices', url: 'https://quickstats.nass.usda.gov/', unit: 'index, 2011 = 100', frequency, values }));
   }
   // CPI, all urban consumers, seasonally adjusted (CUSR0000SA0).
   {
     const rows = await sheetRows(qs('Inputs data.xlsx'), 'CPI- all urban consumers');
     const values: Record<string, number> = {};
     for (const r of rows.slice(1)) { const y = Number(r[2]), m = Number(r[3]), v = Number(r[4]); if (r[0] === 'CUSR0000SA0' && y && m && Number.isFinite(v)) values[key(y, m)] = v; }
-    out.push(finish({ id: 'bls.cpi', name: 'CPI-U, all items, U.S. city average, seasonally adjusted (CUSR0000SA0)', source: 'U.S. Bureau of Labor Statistics via the professor\'s Inputs data workbook', url: 'https://data.bls.gov/timeseries/CUSR0000SA0', unit: 'index, 1982-84 = 100', frequency: 'monthly', values }));
+    out.push(finish({ id: 'bls.cpi', name: 'CPI-U, all items, U.S. city average, seasonally adjusted (CUSR0000SA0)', source: 'U.S. Bureau of Labor Statistics', url: 'https://data.bls.gov/timeseries/CUSR0000SA0', unit: 'index, 1982-84 = 100', frequency: 'monthly', values }));
   }
   // Kansas City Fed agricultural operating loan rate, quarterly, stored at the quarter-end month.
   {
     const rows = await sheetRows(qs('Inputs data.xlsx'), '15- agr interest');
     const values: Record<string, number> = {};
     for (const r of rows.slice(1)) { const d = new Date(r[0]); const v = Number(r[1]); if (!isNaN(d.getTime()) && Number.isFinite(v)) values[key(d.getUTCFullYear(), d.getUTCMonth() + 1)] = v; }
-    out.push(finish({ id: 'kcfed.operatingRate', name: 'Agricultural interest rate on operating loans, Tenth District, quarterly average', source: 'Federal Reserve Bank of Kansas City, Agricultural Finance Databook, via the professor\'s Inputs data workbook', url: 'https://www.kansascityfed.org/agriculture/agfinance-updates/', unit: 'fraction per year', frequency: 'quarterly', values }));
+    out.push(finish({ id: 'kcfed.operatingRate', name: 'Agricultural interest rate on operating loans, Tenth District, quarterly average', source: 'Federal Reserve Bank of Kansas City, Agricultural Finance Databook', url: 'https://www.kansascityfed.org/agriculture/agfinance-updates/', unit: 'fraction per year', frequency: 'quarterly', values }));
   }
   // Live Quick Stats pulls.
   const live: [string, string, string, string][] = [

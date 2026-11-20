@@ -32,4 +32,12 @@ describe('hash state', () => {
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#op-1.price=2&ret-0.laborHours=1&wage.total=3&wage.machine=x&op-x.laborHours=1').returns).toEqual({});
   });
+
+  it('round-trips machine hours edits so a shared link carries them', () => {
+    const s = { crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-2:machineHours': 0.8, 'op-2:laborHours': 1.1 } };
+    const h = serializeHash(s);
+    expect(h).toContain('op-2.machineHours=0.8');
+    expect(parseHash(h)).toEqual(s);
+    expect(parseHash('#ret-0.machineHours=1&op-1.machineHrs=1').returns).toEqual({});
+  });
 });

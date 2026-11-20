@@ -7,19 +7,27 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { FactorSource } from './FactorSource';
 import { LaborEdit } from './LaborEdit';
 import { cn } from '@/lib/utils';
+import { EDITED, EditedMark } from '@/ui';
+import { TableKey } from './TableKey';
 
 export type View = 'today' | 'study' | 'both';
+
+/** A whole-dollar figure with a quiet $ in front: "-$1,234" with only the $ in ash, so the digits stay a tabular column. */
+export function Dollars({ n, className }: { n: number | null | undefined; className?: string }) {
+  if (n == null || !Number.isFinite(n)) return null;
+  return <span className={cn('tnum whitespace-nowrap', className)}>{n < 0 && '-'}<span className="text-ink-3 font-normal mr-px">$</span>{fmt(Math.abs(n))}</span>;
+}
 
 function CellValue({ cell, view, series }: { cell: RepricedCell | undefined; view: View; series: Series[] }) {
   if (!cell) return <span />;
   const main = view === 'study' ? cell.original : cell.repriced;
   if (main === null) return <span className="text-ink-3" title="No amount listed for this year in the study">—</span>;
-  const text = fmt(main);
   const neg = (main ?? 0) < 0;
+  const edited = cell.overridden && view !== 'study';
   const body = (
-    <span className={cn('tnum', neg && 'text-loss', cell.overridden && 'underline decoration-dotted underline-offset-4')}>
-      {text}
-      {view === 'both' && cell.original !== null && cell.original !== cell.repriced && <span className="block text-[11px] text-ink-3 leading-tight">{fmt(cell.original)}</span>}
+    <span className={cn('inline-flex flex-col items-end', neg && 'text-loss')}>
+      <span className={cn('inline-flex items-center gap-1', edited && cn(EDITED, 'rounded px-1 -mx-1'))}>{edited && <EditedMark />}<Dollars n={main} /></span>
+      {view === 'both' && cell.original !== null && cell.original !== cell.repriced && <Dollars n={cell.original} className="text-[11px] text-ink-3 leading-tight" />}
     </span>
   );
   if (cell.original === null) return body;
@@ -41,60 +49,80 @@ function CellValue({ cell, view, series }: { cell: RepricedCell | undefined; vie
   );
 }
 
-function YourCost({ row, col, overrideKey, inline = false, onOverride }: { row: RepricedRow; col: string; overrideKey: string; inline?: boolean; onOverride: (key: string, value: number | null) => void }) {
+/** A cost or income cell as an input box with a quiet $ in front. Every cost cell of an operation, overhead item, interest
+ *  or income row is one; totals stay computed. Leaving the box unchanged keeps whatever set the figure (an index, a factor,
+ *  labor hours); typing a figure makes it your cost, and clearing the box removes your cost. */
+function YourCost({ row, col, overrideKey, view, onOverride }: { row: RepricedRow; col: string; overrideKey: string; view: View; onOverride: (key: string, value: number | null) => void }) {
   const cell = row.cells[col];
   const [text, setText] = useState<string | null>(null);
+  const [start, setStart] = useState('');
   if (!cell) return null;
-  const shown = text ?? fmt(cell.repriced);
+  const neg = (cell.repriced ?? 0) < 0;
+  const what = row.kind === 'returns' ? 'income' : 'cost';
   return (
-    <input
-      id={`edit-${row.id}-${overrideKey}-${inline ? 'inline' : 'column'}`}
-      aria-label={`Your ${row.kind === 'returns' ? 'income' : 'cost'} for ${row.label}, ${col}`}
-      className={cn('w-[88px] px-1.5 text-right tnum text-[13px] rounded border focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 placeholder:text-ink-3', inline ? 'h-11 md:h-[22px] bg-transparent text-[16px] md:text-[13px]' : 'h-11 md:h-7 text-[16px] md:text-[13px] bg-ground', cell.overridden ? 'border-accent bg-accent-soft/40' : inline && row.kind !== 'returns' ? 'border-transparent hover:border-line-strong' : 'border-line', (cell.repriced ?? 0) < 0 && 'text-loss')}
-      placeholder={row.kind === 'returns' && cell.original == null ? 'Enter' : '—'}
-      title={[
-        cell.original == null ? (row.kind === 'returns' ? 'The study prints no amount here. Enter your income.' : 'No amount listed for this year in the study. Enter your cost if applicable.') : `Study: ${fmt(cell.original)}`,
-        cell.original != null && cell.seriesId ? `${cell.seriesId}; index ${cell.indexFrom?.toFixed(2)} to ${cell.indexTo?.toFixed(2)}; factor ${cell.factor?.toFixed(4)}` : '',
-        cell.note,
-      ].filter(Boolean).join('. ')}
-      inputMode="decimal"
-      value={shown}
-      onFocus={() => setText(cell.repriced === null ? '' : String(Math.round(cell.repriced)))}
-      onChange={e => { const raw = e.target.value.replace(/,/g, ''); if (/^-?\d*\.?\d*$/.test(raw)) setText(raw); }}
-      onBlur={() => {
-        if (text === null) return;
-        const n = Number(text);
-        if (text === '' || !Number.isFinite(n)) onOverride(overrideKey, null);
-        else if (cell.repriced === null || Math.round(n) !== Math.round(cell.repriced) || cell.overridden) onOverride(overrideKey, n);
-        setText(null);
-      }}
-      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-    />
+    <span className="inline-flex flex-col items-end">
+      <span className="inline-flex items-center gap-1">
+        {cell.overridden && <EditedMark />}
+        <span className={cn('inline-flex h-11 md:h-[24px] w-[96px] items-center rounded border transition-[border-color,background-color,box-shadow] duration-150 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25', cell.overridden ? EDITED : 'border-line bg-ground hover:border-line-strong')}>
+          <span aria-hidden className="pl-1.5 text-[12px] font-normal text-ink-3">$</span>
+          <input
+            id={`edit-${row.id}-${overrideKey}`}
+            aria-label={`Your ${what} for ${row.label}, ${col}${cell.overridden ? ' (edited)' : ''}`}
+            className={cn('h-full w-full min-w-0 bg-transparent pr-1.5 text-right tnum text-[16px] md:text-[13px] outline-none placeholder:text-ink-3', neg && 'text-loss', cell.repriced === 0 && !cell.overridden && text === null && 'text-ink-3')}
+            placeholder={row.kind === 'returns' && cell.original == null ? 'Enter' : '—'}
+            title={[
+              cell.original == null ? (row.kind === 'returns' ? 'The study prints no amount here. Enter your income.' : 'No amount listed in the study. Enter your cost if it applies.') : `Study: $${fmt(cell.original)}`,
+              cell.original != null && cell.seriesId && !cell.overridden ? `${cell.seriesId}; index ${cell.indexFrom?.toFixed(2)} to ${cell.indexTo?.toFixed(2)}; factor ${cell.factor?.toFixed(4)}` : '',
+              cell.note,
+            ].filter(Boolean).join('. ')}
+            inputMode="decimal"
+            value={text ?? fmt(cell.repriced)}
+            onFocus={e => { const t = cell.repriced === null ? '' : String(Math.round(cell.repriced)); setText(t); setStart(t); { const el = e.target; requestAnimationFrame(() => { if (document.activeElement === el) el.select(); }); } }}
+            onChange={e => { const raw = e.target.value.replace(/[,$]/g, ''); if (/^-?\d*\.?\d*$/.test(raw)) setText(raw); }}
+            onBlur={() => {
+              if (text === null) return;
+              const n = Number(text);
+              if (text !== start) onOverride(overrideKey, text === '' || !Number.isFinite(n) ? null : n);
+              setText(null);
+            }}
+            onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') { setText(start); requestAnimationFrame(() => (e.target as HTMLInputElement).blur()); } }}
+          />
+        </span>
+      </span>
+      {view === 'both' && cell.original !== null && cell.original !== cell.repriced && <Dollars n={cell.original} className="mt-px text-[11px] leading-tight text-ink-3" />}
+    </span>
   );
 }
 
 /** A quantity or price input on a return line, styled like the inline cost inputs. Typing the default figure back (the
  *  study's, or the USDA-adjusted price when one applies) clears the edit. */
-export function LineInput({ id, label, value, original, base, edited, money, onChange }: { id: string; label: string; value: number | null; original: number | null; base?: number | null; edited: boolean; money?: boolean; onChange: (value: number | null) => void }) {
+export function LineInput({ id, label, value, original, base, edited, money, dollar, onChange }: { id: string; label: string; value: number | null; original: number | null; base?: number | null; edited: boolean; money?: boolean; /** a quiet $ inside the box, in place of a "$" printed before it */ dollar?: boolean; onChange: (value: number | null) => void }) {
   const [text, setText] = useState<string | null>(null);
   const show = (n: number | null) => n == null ? '' : n.toLocaleString('en-US', money ? { minimumFractionDigits: 2, maximumFractionDigits: 4 } : { maximumFractionDigits: 4 });
   const reset = base ?? original;
+  const cur = money ? '$' : '';
   return (
-    <input id={id} aria-label={label} inputMode="decimal"
-      className={cn('w-[80px] px-1.5 text-right tnum rounded border focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 h-11 md:h-[22px] bg-transparent text-[16px] md:text-[13px]', edited ? 'border-accent bg-accent-soft/40' : 'border-line')}
-      title={[original == null ? 'The study prints no figure here.' : `Study: ${show(original)}`, base != null && base !== original ? `USDA-adjusted: ${show(base)}` : ''].filter(Boolean).join('. ')}
-      value={text ?? show(value)}
-      onFocus={() => setText(value == null ? '' : String(value))}
-      onChange={e => { const raw = e.target.value.replace(/[,$]/g, ''); if (/^\d*\.?\d*$/.test(raw)) setText(raw); }}
-      onBlur={() => {
-        if (text === null) return;
-        const n = Number(text);
-        if (text === '' || !Number.isFinite(n) || n === reset) { if (edited) onChange(null); }
-        else if (n !== value || !edited) onChange(n);
-        setText(null);
-      }}
-      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-    />
+    <span className="inline-flex items-center gap-1">
+      {edited && <EditedMark />}
+      <span className={cn('inline-flex h-11 md:h-[22px] items-center rounded border transition-[border-color,background-color,box-shadow] duration-150 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25', dollar ? 'w-[88px]' : 'w-[80px]', edited ? EDITED : 'border-line bg-ground hover:border-line-strong')}>
+        {dollar && <span aria-hidden className="pl-1.5 text-[12px] font-normal text-ink-3">$</span>}
+        <input id={id} aria-label={`${label}${edited ? ' (edited)' : ''}`} inputMode="decimal"
+          className="h-full w-full min-w-0 bg-transparent px-1.5 text-right tnum text-[16px] md:text-[13px] outline-none"
+          title={[original == null ? 'The study prints no figure here.' : `Study: ${cur}${show(original)}`, base != null && base !== original ? `USDA-adjusted: ${cur}${show(base)}` : ''].filter(Boolean).join('. ')}
+          value={text ?? show(value)}
+          onFocus={e => { setText(value == null ? '' : String(value)); { const el = e.target; requestAnimationFrame(() => { if (document.activeElement === el) el.select(); }); } }}
+          onChange={e => { const raw = e.target.value.replace(/[,$]/g, ''); if (/^\d*\.?\d*$/.test(raw)) setText(raw); }}
+          onBlur={() => {
+            if (text === null) return;
+            const n = Number(text);
+            if (text === '' || !Number.isFinite(n) || n === reset) { if (edited) onChange(null); }
+            else if (n !== value || !edited) onChange(n);
+            setText(null);
+          }}
+          onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        />
+      </span>
+    </span>
   );
 }
 
@@ -124,10 +152,10 @@ function ReturnLineDetail({ row, view, onOverride }: { row: RepricedRow; view: V
       {editable
         ? <LineInput id={`edit-${row.id}-quantity`} label={`Quantity for ${row.label}, ${d.unit}`} value={q} original={d.quantity.original} edited={d.quantity.edited} onChange={v => onOverride(`${row.id}:quantity`, v)} />
         : <span className="tnum">{num(q)}</span>}
-      <span>{d.unit} at $</span>
+      <span>{d.unit} at</span>
       {editable
-        ? <LineInput id={`edit-${row.id}-price`} label={`Price per ${d.unit} for ${row.label}`} value={p} original={d.price.original} base={d.default} edited={d.price.edited} money onChange={v => onOverride(`${row.id}:price`, v)} />
-        : <span className="tnum">{p == null ? '' : p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>}
+        ? <LineInput id={`edit-${row.id}-price`} label={`Price per ${d.unit} for ${row.label}`} value={p} original={d.price.original} base={d.default} edited={d.price.edited} money dollar onChange={v => onOverride(`${row.id}:price`, v)} />
+        : <span className="tnum"><span className="text-ink-3">$</span>{p == null ? '' : p.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>}
       <span>per {d.unit}</span>
       {view !== 'study' && usesUsda(d) && <span className="whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title={d.published!.seriesId}>USDA {d.published!.year}</span>}
       {view === 'both' && (d.quantity.edited || d.price.edited || usesUsda(d)) && <span className="text-ink-3">(study: {num(d.quantity.original)} at ${d.price.original?.toFixed(2)})</span>}
@@ -152,8 +180,8 @@ function YieldPrice({ label, sale }: { label: string; sale: SalePriceProps }) {
   return <>
     {m?.[1] ?? label}
     <span className="mt-0.5 flex flex-wrap items-center gap-1 text-[12px]">
-      <span>at $</span>
-      <LineInput id="sale-price" label={`Sale price per ${unit}`} value={sale.value} original={sale.studyPrice} base={sale.usda?.price ?? sale.studyPrice} edited={sale.edited} money onChange={sale.onChange} />
+      <span>at</span>
+      <LineInput id="sale-price" label={`Sale price per ${unit}`} value={sale.value} original={sale.studyPrice} base={sale.usda?.price ?? sale.studyPrice} edited={sale.edited} money dollar onChange={sale.onChange} />
       <span>per {unit}</span>
       {usda && <span className="whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title={usda.seriesId}>USDA {usda.year}</span>}
     </span>
@@ -171,13 +199,13 @@ function YieldPriceNotes({ sale }: { sale: SalePriceProps }) {
     {usda?.disclaimers.map(t => <span key={t} className="block">Note: {t}</span>)}
     {(sale.reset || sale.toStudy) && <span className="block">
       {sale.reset && <button type="button" className={link} onClick={() => sale.onChange(sale.reset!.value)}>{sale.reset.label}</button>}
-      {sale.reset && sale.toStudy && ' · '}
+      {sale.reset && sale.toStudy && <span className="inline-block w-4" />}
       {sale.toStudy && <button type="button" className={link} onClick={() => sale.onChange(sale.toStudy!.value)}>{sale.toStudy.label}</button>}
     </span>}
   </>;
 }
 
-export function StudyTable({ table, study, series, view, salePrice = null, onOverride, onFactor }: { table: RepricedTable; study: StudyPick | null; series: Series[]; view: View; salePrice?: SalePriceProps | null; onFactor: (key: string, value: number | null) => void; onOverride: (key: string, value: number | null) => void }) {
+export function StudyTable({ table, study, series, view, salePrice = null, typedKeys = new Set(), onOverride, onFactor }: { table: RepricedTable; study: StudyPick | null; series: Series[]; view: View; salePrice?: SalePriceProps | null; /** override keys of figures the lender typed, so a factor's Reset shows only where there is a typed figure to clear */ typedKeys?: Set<string>; onFactor: (key: string, value: number | null) => void; onOverride: (key: string, value: number | null) => void }) {
   const isProd = table.layout === 'production';
   const hasTime = table.columns.some(c => c.key === 'timeHrs');
   const cols = table.columns.filter(c => c.key !== 'timeHrs');
@@ -225,7 +253,7 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                 return <tr key={r.id}><td colSpan={columnCount} className="pt-2 pb-0.5">
                   <button type="button" aria-expanded={open} onClick={() => toggle(r.id)} className="group sticky left-0 flex w-full max-w-[calc(100vw-5rem)] md:max-w-none items-center gap-2 rounded px-1 -mx-1 text-left min-h-11 md:min-h-8 hover:bg-accent-soft/50">
                     <span className="font-bold">{r.label}</span>
-                    {sec.edited && <span className="whitespace-nowrap rounded border border-accent bg-accent-soft/40 px-1 text-[11px] text-accent-deep">edited</span>}
+                    {sec.edited && <span className="inline-flex items-center gap-1 whitespace-nowrap text-[12px] font-normal text-accent-deep"><EditedMark />edited</span>}
                     <span className="ml-auto whitespace-nowrap rounded-full border border-line px-2.5 py-0.5 text-[12px] text-accent group-hover:border-accent">{open ? 'Hide lines ▴' : `Show ${sec.details} ${sec.details === 1 ? 'line' : 'lines'} ▾`}</span>
                   </button>
                 </td></tr>;
@@ -238,23 +266,32 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
                     {view === 'study' ? r.label : r.displayLabel ?? r.label}
                     {usesFallback(r) && <span className="ml-2 whitespace-nowrap rounded border border-line px-1 text-[11px] text-ink-3" title="No specific index matched this label, so the consumer price index (CPI) reprices it.">CPI fallback</span>}
                     {r.sourceNote && <span className="block text-[11px] leading-snug text-ink-2">{r.sourceNote}</span>}
-                    {r.labor && <LaborEdit row={r} view={view} onOverride={onOverride} />}
+                    {(r.labor || r.machine) && <LaborEdit row={r} view={view} onOverride={onOverride} />}
                     {r.returnLine && <ReturnLineDetail row={r} view={view} onOverride={onOverride} />}
                     {r.returnLine && view !== 'study' && <PriceSource row={r} />}
                     {r.returnLine && r.page != null && <span className="block text-[11px] leading-snug text-ink-3">{study ? <a className="underline underline-offset-2" href={`${study.url}#page=${r.page}`} target="_blank" rel="noreferrer">Study, page {r.page}</a> : `Study, page ${r.page}`}{r.quote && `: "${r.quote}"`}</span>}
                     {r.kind === 'returns' && <span className="block text-[11px] leading-snug text-ink-2 normal-case">{returnsHint(r, isProd, view, !!table.yieldRow)}</span>}
                     {r.id === 'gross' && r.kind === 'subtotal' && <span className="block text-[11px] leading-snug text-ink-2 normal-case font-normal">{r.cells.total?.overridden ? r.cells.total.note : 'Sum of the return lines above.'}</span>}
                   </td>
-                  {(showTime || hasTime) && <td className={cn('py-[3px] px-2 text-right tnum', part('timeHrs'))}>{fmtHrs(hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs)}</td>}
+                  {(showTime || hasTime) && <td className={cn('py-[3px] px-2 text-right tnum', part('timeHrs'))}>{(() => {
+                    // Today's and both views show your machine hours where you changed them; the study view keeps the printed time.
+                    const printed = hasTime ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs;
+                    const mine = view !== 'study' && r.machine?.edited;
+                    return mine
+                      ? <span className={cn('inline-flex items-center gap-1 rounded px-1 -mx-1', EDITED)} title={`Study: ${fmtHrs(printed)} hrs`}><EditedMark />{fmtHrs(r.machine!.current)}</span>
+                      : fmtHrs(printed);
+                  })()}</td>}
                   {cols.map(c => {
                     const cell = r.cells[c.key];
                     const factorable = (r.kind === 'operation' || r.kind === 'overheadItem') && cell?.original != null && cell.original > 0 && cell.factor != null;
                     const key = r.kind === 'returns' && !isProd ? `income:${c.key}` : `${r.id}:${c.key}`;
                     return <Fragment key={c.key}>
-                      {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /> : '—'}</td>}
-                      <td className={cn('py-[3px] px-2 text-right', part(c.key))}>{cellFactor(c.key) && factorable
-                        ? <div className="flex flex-col items-end gap-1"><CellValue cell={cell} view={view} series={series} /><FactorInput compact cell={cell} label={`${r.label}, ${c.label}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} onChange={value => onFactor(key, value)} /></div>
-                        : editable && (!factorable || !showFactors) && (!isProd || c.key === 'total') && view !== 'study' ? <YourCost row={r} col={c.key} inline overrideKey={key} onOverride={onOverride} /> : <CellValue cell={cell} view={view} series={series} />}</td>
+                      {factorColumn(c.key) && <td className="py-1 px-2 text-right min-w-[110px]">{factorable ? <FactorInput cell={cell} label={`${r.label}, ${c.key}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} typed={typedKeys.has(key)} onChange={value => onFactor(key, value)} /> : '—'}</td>}
+                      <td className={cn('py-[3px] px-2 text-right whitespace-nowrap', part(c.key))}>{editable && view !== 'study' && cell
+                        ? cellFactor(c.key) && factorable
+                          ? <div className="flex flex-col items-end gap-1"><YourCost row={r} col={c.key} view={view} overrideKey={key} onOverride={onOverride} /><FactorInput compact cell={cell} label={`${r.label}, ${c.label}`} source={<FactorSource row={r} column={c.key} table={table} series={series} study={study} />} typed={typedKeys.has(key) || (c.key === 'total' && typedKeys.has(r.id))} onChange={value => onFactor(key, value)} /></div>
+                          : <YourCost row={r} col={c.key} view={view} overrideKey={key} onOverride={onOverride} />
+                        : <CellValue cell={cell} view={view} series={series} />}</td>
                     </Fragment>;
                   })}
                 </tr>
@@ -266,16 +303,19 @@ export function StudyTable({ table, study, series, view, salePrice = null, onOve
           <h2 className="text-[15px] font-bold tracking-wide uppercase mt-0.5">{table.title}</h2>
           <div className="text-[13px] text-ink-2">{[study?.region, study?.year].filter(Boolean).join(' - ')}</div>
         </div>
-        {!isProd && <p className="mb-2 text-[12px] text-ink-2">Years after planting · USD per acre · — No amount listed in the study{view !== 'study' && ' · Click a cell to edit'}</p>}
+        <p className="mb-2 text-[12px] text-ink-2">{isProd ? 'Dollars per acre for one year at full production; time in hours per acre.' : 'Dollars per acre, by year after planting. A dash means the study lists no amount.'}{view !== 'study' && ' Every boxed figure can be edited; totals follow.'}</p>
         {table.establishmentNote && <p className="mb-2 text-[13px] text-ink">{table.establishmentNote}</p>}
         <p className="mb-3 text-[12px] text-ink-2">{fallbackSentence(table)}{table.summary.fallbackRows > 0 && ' Those rows are tagged CPI fallback.'} {table.rows.some(r => r.returnLine?.published) ? 'Returns are not indexed by cost series. Lines marked USDA use the study price times USDA\'s California price ratio (latest year over the study year); the others keep the study price. Change the quantity, price or value of a return line to update it.' : table.rows.some(r => r.returnLine) ? 'Returns are not indexed; change the quantity, price or value of a return line to update it.' : 'Returns are not indexed; type a value in a returns row to update it.'}</p>
+        <TableKey table={table} />
         <div className="mb-2 flex flex-wrap items-center gap-2 text-[13px]">
           {collapsible.length > 0 && <button type="button" className="h-11 md:h-8 px-3 rounded-full border border-line text-ink-2 hover:border-accent" onClick={() => setExpanded(allOpen ? new Set() : new Set(collapsible))}>{allOpen ? 'Hide all lines ▴' : 'Show all lines ▾'}</button>}
           {view !== 'study' && <button type="button" aria-pressed={showFactors} className={cn('h-11 md:h-8 px-3 rounded-full border', showFactors ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line text-ink-2 hover:border-accent')} onClick={() => setShowFactors(s => !s)}>{showFactors ? 'Hide adjustment factors' : 'Edit adjustment factors'}</button>}
           {isProd && <button type="button" aria-pressed={allCols} className={cn('md:hidden h-11 px-3 rounded-full border', allCols ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line text-ink-2')} onClick={() => setAllCols(s => !s)}>{allCols ? 'Totals only' : 'Labor, fuel and material columns'}</button>}
           <span className="text-[12px] text-ink-3">{showFactors && view !== 'study' ? 'Adjustment factor × study cost = adjusted cost; 1.10 means a 10% increase.' : allOpen ? 'Every line is shown.' : 'Totals are shown. Open a section to see and edit its lines.'}</span>
         </div>
-        <div className="overflow-x-auto -mx-1 px-1" role="region" aria-label="Cost table" tabIndex={0}>
+        {/* The table scrolls sideways inside its card when it is wider (factors on, a phone). No side padding here: the sticky
+            first column sticks to the region's edge, so nothing scrolled shows through to its left. */}
+        <div className="overflow-x-auto overscroll-x-contain" role="region" aria-label="Cost table" tabIndex={0}>
         <table className={cn('w-full text-[13px] border-collapse', showFactors && view !== 'study' && 'min-w-[1100px]')}>
           <thead>
             <tr className="border-b border-ink align-bottom">
@@ -306,16 +346,19 @@ function returnsHint(row: RepricedRow, isProd: boolean, view: View, hasPrice: bo
 }
 
 /** `compact` is the per-cost-item version inside a production cell: a smaller input under the dollar figure. */
-function FactorInput({ cell, label, source, onChange, compact = false }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void; compact?: boolean }) {
+function FactorInput({ cell, label, source, onChange, compact = false, typed = false }: { cell: RepricedCell; label: string; source: React.ReactNode; onChange: (value: number | null) => void; compact?: boolean; /** a typed dollar figure is stored for this cell */ typed?: boolean }) {
   const [draft, setDraft] = useState<string | null>(null);
   return <div className={cn('flex items-center justify-end', compact ? 'flex-nowrap gap-1 whitespace-nowrap' : 'flex-wrap min-w-[140px] gap-2')}>
     <input aria-label={`Adjustment factor for ${label}`} type="number" min="0" step="0.01" inputMode="decimal"
-      className={cn('h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] tnum', compact ? 'w-[68px] md:h-6 md:text-[12px]' : 'w-[78px] md:text-[13px]', cell.factorOverridden && 'border-accent bg-accent-soft/40')}
+      className={cn('h-11 md:h-7 rounded border border-line px-1 text-right text-[16px] tnum transition-[border-color,background-color] duration-150 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/25', compact ? 'w-[68px] md:h-6 md:text-[12px]' : 'w-[78px] md:text-[13px]', cell.factorOverridden && EDITED)}
       value={draft ?? (cell.factor ?? 1).toFixed(4)}
       onChange={e => setDraft(e.target.value)}
       onBlur={() => { if (draft !== null) { const n = Number(draft); if (draft === '') onChange(null); else if (Number.isFinite(n) && n >= 0 && draft !== (cell.factor ?? 1).toFixed(4)) onChange(n); setDraft(null); } }}
       onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
     {source}
-    {cell.overridden && <button className="min-h-11 md:min-h-7 text-xs text-accent underline" onClick={() => { setDraft(null); onChange(null); }}>Reset</button>}
+    {/* Reset clears a typed factor or a typed figure on this cell. A cell changed only through hours (fuel scaled by machine
+        hours, labor from labor hours) keeps its plain price factor, so there is nothing here to reset: that edit resets
+        from its hours input or the changes list. */}
+    {(cell.factorOverridden || typed) && <button type="button" className="min-h-11 md:min-h-7 text-xs text-accent underline" onClick={() => { setDraft(null); onChange(null); }}>Reset</button>}
   </div>;
 }

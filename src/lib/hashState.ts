@@ -15,7 +15,8 @@ export interface HashState {
 
 export const DEFAULT_HASH: HashState = { crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} };
 
-const RETURN_PARAM = /^(ret-\d+|gross)\.(price|quantity|total)$|^(op-\d+)\.(laborHours)$|^(wage)\.(machine|general)$/;
+// Machine time edits too: 'op-3:machineHours' is 'op-3.machineHours=0.8'.
+const RETURN_PARAM = /^(ret-\d+|gross)\.(price|quantity|total)$|^(op-\d+)\.(laborHours|machineHours)$|^(wage)\.(machine|general)$/;
 
 export function parseHash(hash: string): HashState {
   const q = new URLSearchParams(hash.replace(/^#/, ''));

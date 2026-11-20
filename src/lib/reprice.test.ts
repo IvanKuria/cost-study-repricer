@@ -354,11 +354,12 @@ describe('recalculated yearly establishment charge', () => {
     const items = t.rows.filter(r => r.section === 'Cash overhead' && r.kind === 'overheadItem');
     expect(row(t, 'total-cash-oh').cells.total.repriced).toBeCloseTo(items.reduce((s, r) => s + r.cells.total.repriced!, 0), 8);
     expect(row(t, 'total-cash-oh').cells.total.original).toBeCloseTo(row(repriceStudy(avocado, prod), 'total-cash-oh').cells.total.original!, 8);
-    // With a printed rate that reproduces the study amount, the rate times the average investment is used.
+    // With a printed rate that reproduces the study amount, the rate times the average value ((cost + salvage) / 2) is used.
     const rated = repriceStudy(tier1({ investmentCharges: { ...contract.investmentCharges, taxRatePct: 1 } }), prod);
     const taxEst = row(rated, `${lineId(rated, 'Property Taxes, other investments')}-establishment`);
     expect(taxEst.cells.total.repriced).toBeCloseTo(0.01 * basis.repriced! / 2, 8);
-    expect(taxEst.sourceNote).toMatch(/^Recalculated: 1% property tax rate x \$[\d,]+ repriced establishment cost \(year 3, accumulated net cash cost\) \/ 2 average investment = \$\d+\.$/);
+    expect(taxEst.sourceNote).toMatch(/^Recalculated: 1% property tax x average value \(\$[\d,]+ cost \+ \$0 salvage\) \/ 2 = \$\d+; the cost is the repriced establishment cost \(year 3, accumulated net cash cost\)\.$/);
+    expect(taxEst.sourceNote).not.toMatch(/investment/);
   });
 
   it('the interest rate in use replaces the study rate in the CRF; a lender capital recovery rate beats both', () => {

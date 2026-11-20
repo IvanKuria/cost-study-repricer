@@ -1,5 +1,35 @@
 import type { RepricedTable } from './types';
 import { fallbackSentence, fmt, fmtHrs, lineText, periodText, priceSourceLines, repricingSentence, returnLines, type ExportMeta } from './exportShared';
+import { changeValue, changeWhere, type UserChange } from './exportChanges';
+
+/** A money cell: "$1,234", "-$1,234", blank for none. */
+const money = (n: number | null | undefined) => { const t = fmt(n); return t === '' ? '' : t.startsWith('-') ? `-$${t.slice(1)}` : `$${t}`; };
+/** The light tint under an edited figure, matching the screen's edited style in print. */
+const EDIT_FILL: [number, number, number] = [232, 239, 255];
+const KIND_WORDS: Record<UserChange['kind'], string> = {
+  cost: 'Cost', income: 'Income', factor: 'Adjustment factor', price: 'Price', quantity: 'Quantity', 'return value': 'Return value',
+  'labor hours': 'Labor hours', 'machine hours': 'Machine hours', wage: 'Wage', 'interest rate': 'Interest rate', 'capital recovery rate': 'Capital recovery rate', acres: 'Acres',
+};
+
+type AutoTable = (typeof import('jspdf-autotable'))['default'];
+type Doc = InstanceType<(typeof import('jspdf'))['jsPDF']>;
+/** The "Your changes" section: every lender edit with the figure before and after. Returns the y below it. */
+function changesTable(doc: Doc, autoTable: AutoTable, changes: UserChange[], y: number, o: { margin: number; H: number; font: 'helvetica' | 'times'; size: number; ink: [number, number, number]; grey: [number, number, number] }): number {
+  if (!changes.length) return y;
+  if (y > o.H - 110) { doc.addPage(); y = o.margin + 10; }
+  doc.setFont(o.font, 'bold'); doc.setFontSize(o.size + 1.5); doc.setTextColor(...o.ink);
+  doc.text(`Your changes (${changes.length})`, o.margin, y); y += 4;
+  autoTable(doc, {
+    startY: y, margin: { left: o.margin, right: o.margin, bottom: 48 }, theme: 'plain',
+    head: [['Where', 'What', 'Before', 'Yours']],
+    body: changes.map(c => [changeWhere(c), KIND_WORDS[c.kind], c.from == null ? `not in ${c.fromLabel.toLowerCase()}` : `${changeValue(c.from, c.unit)} (${c.fromLabel.toLowerCase()})`, { content: `${changeValue(c.to, c.unit)} *`, styles: { fontStyle: 'bold', fillColor: EDIT_FILL } }]),
+    styles: { font: o.font, fontSize: o.size, cellPadding: { top: 1.6, bottom: 1.6, left: 3, right: 3 }, textColor: o.ink, overflow: 'linebreak' },
+    headStyles: { fontStyle: 'normal', textColor: o.grey, lineWidth: { bottom: 0.5 }, lineColor: o.ink },
+    columnStyles: { 2: { halign: 'right', cellWidth: 110 }, 3: { halign: 'right', cellWidth: 90 }, 1: { cellWidth: 110 } },
+    didParseCell: (d) => { if (d.section === 'head' && d.column.index >= 2) d.cell.styles.halign = 'right'; },
+  });
+  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 14;
+}
 
 /**
  * The study's table on a landscape letter page, laid out the way UC prints it: a title block,
@@ -42,9 +72,14 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
     const line = r.returnLine ? `\n    ${lineText(r.returnLine.quantity.current, r.returnLine.unit, r.returnLine.price.current)}` : '';
     const label = caps ? r.label.toUpperCase() : `    ${r.label}${line}${r.sourceNote ? `\n    ${r.sourceNote}` : ''}`;
-    const cells = columns.map(c => fmt(r.cells[c.key]?.repriced) + (r.cells[c.key]?.overridden ? ' *' : ''));
-    const hrs = timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs;
-    body.push([label, ...(isProd ? [fmtHrs(hrs)] : []), ...cells].map((v, i) => ({ content: v, styles: { fontStyle: caps && i === 0 ? 'bold' : 'normal' } })));
+    const edited = columns.map(c => !!r.cells[c.key]?.overridden);
+    const cells = columns.map((c, i) => money(r.cells[c.key]?.repriced) + (edited[i] ? ' *' : ''));
+    const hrs = r.machine?.current ?? (timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs);
+    const hrsEdited = !!r.machine?.edited;
+    body.push([label, ...(isProd ? [fmtHrs(hrs) + (hrsEdited ? ' *' : '')] : []), ...cells].map((v, i) => {
+      const isEdited = i === 0 ? false : isProd && i === 1 ? hrsEdited : edited[i - (isProd ? 2 : 1)];
+      return { content: v, styles: { fontStyle: (caps && i === 0) || isEdited ? 'bold' : 'normal', ...(isEdited ? { fillColor: EDIT_FILL } : {}) } };
+    }));
   }
   autoTable(doc, {
     startY: margin + 50, margin: { left: margin, right: margin, bottom: 48 }, head, body, theme: 'plain',
@@ -52,6 +87,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
     headStyles: { fontStyle: 'normal', textColor: grey, halign: 'right', valign: 'bottom', lineWidth: { bottom: 0.5 }, lineColor: ink },
     columnStyles: Object.fromEntries(head[0].map((_, i) => [i, { halign: i === 0 ? 'left' : 'right', cellWidth: i === 0 ? 190 : 'auto' }])),
     didParseCell: (d) => {
+      if (d.section === 'head' && d.column.index === 0) d.cell.styles.halign = 'left';
       if (d.section !== 'body') return;
       const k = rowMeta[d.row.index]?.kind;
       if (k === 'subtotal' || k === 'total' || k === 'net') d.cell.styles.lineWidth = { top: 0.4, bottom: 0, left: 0, right: 0 };
@@ -64,6 +100,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   const endY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
   let y = endY + 14;
   const H = doc.internal.pageSize.getHeight();
+  y = changesTable(doc, autoTable, meta.changes ?? [], y, { margin, H, font: 'helvetica', size: 7.5, ink, grey });
   const para = (text: string, size = 7.5, color: [number, number, number] = grey) => {
     doc.setFontSize(size); doc.setTextColor(...color); doc.setFont('helvetica', 'normal');
     const lines = doc.splitTextToSize(text, W - margin * 2) as string[];
@@ -74,12 +111,12 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   if (lines.length) {
     if (y > H - 120) { doc.addPage(); y = margin; }
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(...ink);
-    doc.text('Return lines (not indexed). Source USDA: the study price times USDA\'s California price ratio, latest year over the study year. * marks a lender edit.', margin, y); y += 4;
+    doc.text('Return lines (not indexed). Source USDA: the study price times USDA\'s California price ratio, latest year over the study year. * marks your change.', margin, y); y += 4;
     const n = (v: number | null, digits = 0) => v == null ? '' : v.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: Math.max(digits, 4) });
     autoTable(doc, {
       startY: y, margin: { left: margin, right: margin, bottom: 48 }, theme: 'plain',
       head: [['Line', 'Unit', 'Quantity (study)', 'Quantity (now)', 'Price (study)', 'Price (now)', 'Value (study)', 'Value (now)', 'Source']],
-      body: lines.map(l => [l.label + (l.note ? `\n${l.note}` : ''), l.unit, n(l.quantity[0]), n(l.quantity[1]) + (l.edited && l.quantity[0] !== l.quantity[1] ? ' *' : ''), n(l.price[0], 2), n(l.price[1], 2) + (l.edited && l.price[0] !== l.price[1] ? ' *' : ''), fmt(l.value[0]), fmt(l.value[1]) + (l.edited ? ' *' : ''), `${l.what}${l.page != null ? `, page ${l.page}` : ''}`]),
+      body: lines.map(l => [l.label + (l.note ? `\n${l.note}` : ''), l.unit, n(l.quantity[0]), n(l.quantity[1]) + (l.edited && l.quantity[0] !== l.quantity[1] ? ' *' : ''), (l.price[0] == null ? '' : '$') + n(l.price[0], 2), (l.price[1] == null ? '' : '$') + n(l.price[1], 2) +(l.edited && l.price[0] !== l.price[1] ? ' *' : ''), money(l.value[0]), money(l.value[1]) + (l.edited ? ' *' : ''), `${l.what}${l.page != null ? `, page ${l.page}` : ''}`]),
       styles: { font: 'helvetica', fontSize: 7.5, cellPadding: { top: 1.6, bottom: 1.6, left: 3, right: 3 }, textColor: ink, overflow: 'linebreak' },
       headStyles: { fontStyle: 'normal', textColor: grey, lineWidth: { bottom: 0.5 }, lineColor: ink },
       columnStyles: { 0: { cellWidth: 190 }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } },
@@ -88,7 +125,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   }
   if (table.establishmentNote) para(table.establishmentNote, 8, ink);
   if (options.includeDetails) {
-  para(repricingSentence(table, meta) + ' * marks an edited value.');
+  para(repricingSentence(table, meta) + ' * marks your change.');
   para(fallbackSentence(table));
   for (const note of table.notes ?? []) para(note);
   if (meta.study) para(`Source study: UC Davis, ${meta.study.title}, ${meta.study.region}, ${meta.study.year}. ${meta.study.url}`);
@@ -101,7 +138,7 @@ export async function buildPdf(table: RepricedTable, meta: ExportMeta, options: 
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p); doc.setFontSize(7); doc.setTextColor(...grey);
     if (meta.sourcesUrl) doc.textWithLink('Sources and calculations', margin, H - 32, { url: meta.sourcesUrl });
-    doc.text('Cost study repricer, all money in USD | * Edited', margin, H - 18);
+    doc.text('Cost study repricer, all money in USD per acre. * Your change, listed under Your changes', margin, H - 18);
     doc.text(`Page ${p} of ${pages}`, W - margin, H - 18, { align: 'right' });
   }
   return new Uint8Array(doc.output('arraybuffer'));
@@ -142,7 +179,7 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
       startY: 86, margin: { top: 86, bottom: 48, left: margin, right: margin }, head,
       body: rows.map(r => [clean(r.displayLabel ?? r.label) + (r.kind === 'heading' ? ':' : ''), ...table.columns.map(c => {
         const cell = r.cells[c.key];
-        return fmt(cell?.repriced) + (cell?.overridden ? '*' : '');
+        return { content: money(cell?.repriced) + (cell?.overridden ? ' *' : ''), styles: cell?.overridden ? { fontStyle: 'bold' as const, fillColor: EDIT_FILL } : {} };
       })]),
       theme: 'plain', showHead: 'everyPage', rowPageBreak: 'avoid',
       styles: { font: 'times', fontSize: 9, cellPadding: { top: 0.6, bottom: 0.6, left: 3, right: 3 }, textColor: [0, 0, 0], overflow: 'linebreak', halign: 'right' },
@@ -162,6 +199,11 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
       didDrawPage(d) { title(groupIndex > 0 || d.pageNumber > 1); },
     });
   });
+  // Your changes, after the table: on the last table page when it fits, else on a page of its own.
+  if (meta.changes?.length) {
+    const endY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    changesTable(doc, autoTable, meta.changes.map(c => ({ ...c, row: clean(c.row) })), endY + 18, { margin, H: 792, font: 'times', size: 9, ink: [0, 0, 0], grey: [80, 80, 80] });
+  }
   if (options.includeDetails) {
   doc.addPage();
   let y = 42;
@@ -175,7 +217,7 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
     y += 6;
   };
   paragraph('Calculation notes and sources', true);
-  paragraph('Repriced worksheet. * marks a lender edit.');
+  paragraph('Repriced worksheet. * marks your change.');
   paragraph(repricingSentence(table, meta));
   paragraph(fallbackSentence(table));
   if (table.establishmentNote) paragraph(table.establishmentNote);
@@ -188,7 +230,7 @@ async function buildEstablishmentPdf(table: RepricedTable, meta: ExportMeta, opt
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p); doc.setFont('times', 'normal'); doc.setFontSize(8);
     if (meta.sourcesUrl) doc.textWithLink('Sources and calculations', margin, 755, { url: meta.sourcesUrl });
-    doc.text('Cost study repricer | USD per acre | * Edited', margin, 770);
+    doc.text('Cost study repricer | USD per acre. * Your change, listed under Your changes', margin, 770);
     doc.text(`${p} / ${pages}`, 572, 770, { align: 'right' });
   }
   return new Uint8Array(doc.output('arraybuffer'));

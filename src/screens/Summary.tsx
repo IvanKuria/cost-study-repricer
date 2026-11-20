@@ -35,16 +35,15 @@ export function Summary({ table, acres, price }: { table: RepricedTable; acres: 
         <Figure label="Net returns above total cost" p={f.net} acres={acres} />
       </div>
       {/* The rest of the old facts row, in one line: the headline figures above already carry cost per acre and the acres total. */}
-      <div className="text-[13px] text-ink-2 tnum">{[
-        table.summary.cashPerAcreRepriced != null && `Cash cost ${money(table.summary.cashPerAcreRepriced)} per acre (operating plus cash overhead)`,
-        peak && `peak cash need ${money(peak.value)} per acre, accumulated by the ${peak.column}${/^\d/.test(peak.column) ? ' year' : ''}`,
-        `repriced to ${periodLabel(table.targetPeriod)} from ${periodLabel(table.referencePeriod)}`,
-      ].filter(Boolean).join(' · ')}</div>
+      <div className="text-[13px] text-ink-2 tnum space-y-0.5">
+        {table.summary.cashPerAcreRepriced != null && <p>Cash cost: {money(table.summary.cashPerAcreRepriced)} per acre, operating plus cash overhead.</p>}
+        {peak && <p>Peak cash need: {money(peak.value)} per acre, accumulated by the {peak.column}{/^\d/.test(peak.column) ? ' year' : ''}.</p>}
+        <p>Repriced to {periodLabel(table.targetPeriod)} from {periodLabel(table.referencePeriod)}.</p>
+      </div>
       {price && <div className="text-[13px] text-ink-2">
         <label htmlFor="your-price" className="block font-medium text-ink-2 mb-1">Your price</label>
         <span className="flex flex-wrap items-center gap-1">
-          <span>$</span>
-          <LineInput id="your-price" label={`Your sale price per ${price.unit}`} value={price.value} original={price.original} base={price.base} edited={price.edited} money onChange={price.onChange} />
+          <LineInput id="your-price" label={`Your sale price per ${price.unit}`} value={price.value} original={price.original} base={price.base} edited={price.edited} money dollar onChange={price.onChange} />
           <span>per {price.unit}</span>
           {price.edited && price.base != null && <button type="button" className={cn(link, 'ml-2 min-h-11 md:min-h-0')} onClick={() => price.onChange(null)}>Use {price.usda ? 'USDA' : 'study'} price ({money2(price.base)})</button>}
         </span>

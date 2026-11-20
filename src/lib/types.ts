@@ -1,7 +1,7 @@
 // Contract for the cost-study repricer. Every number shown to a lender is either printed in a UC
 // study, comes from a named price series, or was typed by the lender. Nothing is estimated otherwise.
 
-/** The professor's eleven cost categories, from Budgets data.xlsx. */
+/** The eleven cost categories of the Budgets data.xlsx workbook. */
 export type Category =
   | 'labor' | 'pesticides' | 'fertilizer' | 'water' | 'pollination' | 'custom'
   | 'otherMaterials' | 'fuelLubeRepairs' | 'operatingInterest' | 'cashOverhead' | 'nonCashOverhead' | 'establishmentCpi';
@@ -75,6 +75,7 @@ export interface RepricedCell {
   repriced: number | null;        // original x factor, or the override
   overridden: boolean;
   fallback?: boolean;             // no specific index matched the row's label, so the CPI fallback priced it
+  hoursScale?: number;            // fuel, lube & repairs of a row whose machine time was edited: lender hours / study hours, so repriced = original x factor x hoursScale
   recalculated?: boolean;         // computed from other repriced figures (establishment capital recovery, insurance, taxes), not indexed; `note` shows the working
 }
 
@@ -92,6 +93,7 @@ export interface RepricedRow {
   sourceNote?: string | null;     // plain-words source line shown under the label, e.g. where an establishment total was printed
   returnLine?: ReturnLineDetail;  // a production return line (crop or byproduct): its printed and current quantity and price
   labor?: LaborDetail;            // a production operation with printed labor: its labor hours and wage, or its labor dollars when no hours reproduce them
+  machine?: MachineDetail;        // a production operation with printed machine time: its machine hours per acre, editable
   totalKey?: EstablishmentTotalKey; // an establishment table total: which one
   net?: EstablishmentNet;         // an establishment table net row: what it nets
 }
@@ -111,6 +113,16 @@ export interface LaborDetail {
   ratio: number | null;           // operator hours over machine time, for 'machine'
   wage: LaborWage | null;         // the wage these hours are paid at; null for 'dollars'
   dollars: { original: number; current: number; edited: boolean }; // labor cost per acre; edited when hours, wage or the dollars were changed
+}
+
+/** An operation's machine time (the Time column, hours per acre), editable where the study prints it for a machine
+ *  operation. Fuel, lube and repairs are costs per machine hour, so they scale with it; operator labor hours are machine
+ *  time x `laborRatio` where the row's labor is machine labor (`laborRatio` null otherwise: its labor stays as it is). */
+export interface MachineDetail {
+  original: number;               // the study's machine hours per acre
+  current: number;                // the lender's hours, else the study's
+  edited: boolean;
+  laborRatio: number | null;      // operator labor hours per machine hour, when labor follows machine time
 }
 
 /** A study-wide labor wage per hour, overhead included, as the cost table uses it. */
@@ -145,7 +157,13 @@ export interface ReturnLineDetail {
   kept: string | null;            // why the study price is kept when USDA prices are on and none applies
 }
 
+/** One line of the table key: what a column (or, in the establishment table, a kind of row) holds, with the study's own
+ *  sentence behind it when the parsed text has one. */
+export interface ColumnKeyEntry { column: string; text: string; source: { page: number; quote: string } | null }
+
 export interface RepricedTable {
+  /** What each column means for this layout, for the key above the table. */
+  columnKey?: ColumnKeyEntry[];
   notes?: string[];
   /** USDA crop price series used for this table's income, for the sources list. */
   priceSources?: { series: CropPrice; year: string; value: number }[];

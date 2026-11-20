@@ -1,5 +1,12 @@
 import type { RepricedTable } from './types';
 import { fallbackSentence, periodText, repricingSentence, returnLines, type ExportMeta } from './exportShared';
+import { changeForCell, changeSentence, type UserChange } from './exportChanges';
+
+/** Whole dollars and cents in currency format, negatives red. */
+const USD = '"$"#,##0;[Red]-"$"#,##0';
+const USD2 = '"$"#,##0.00##;[Red]-"$"#,##0.00##';
+/** The fill under an edited cell: the same light accent tint as the screen. */
+const EDIT_FILL = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFE8EFFF' } };
 
 /** One sheet with the study table (original, factor, and adjusted cost per column) and a Sources sheet. */
 export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Promise<Uint8Array> {
@@ -15,36 +22,51 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   const columns = table.columns.filter(c => c.key !== 'timeHrs');
   const header: string[] = ['Operation', ...(isProd ? ['Time (Hrs/A)'] : [])];
   for (const c of columns) header.push(`${c.label} (study)`, `${c.label} factor`, `${c.label} (today)`);
+  const changes = meta.changes ?? [];
+  // The last column names the lender's changes on each row, so a filtered or printed sheet still says what was edited.
+  header.push('Your change');
+  const noteCol = header.length;
   const h = ws.addRow(header); h.font = { bold: true }; h.alignment = { wrapText: true, vertical: 'bottom' };
   h.eachCell(cell => { cell.border = { bottom: { style: 'thin' } }; });
   if (table.yieldRow) {
-    const values: (string | number | null)[] = [table.yieldRow.label];
+    // Yields are quantities, not dollars.
+    const values: (string | number | null)[] = [table.yieldRow.label, ...(isProd ? [null] : [])];
     for (const v of table.yieldRow.values) values.push(v, null, v);
-    ws.addRow(values);
+    const yr = ws.addRow(values);
+    yr.eachCell((cell, col) => { if (col > 1 && typeof cell.value === 'number') cell.numFmt = '#,##0.##'; });
   }
   for (const r of table.rows) {
     if (r.kind === 'blank') { ws.addRow([]); continue; }
     const caps = r.kind === 'subtotal' || r.kind === 'total' || r.kind === 'net' || (r.kind === 'returns' && !r.returnLine);
     const label = r.displayLabel ?? r.label;
     const vals: (string | number | null)[] = [caps ? label.toUpperCase() : r.kind === 'heading' ? label : `  ${label}`];
-    if (isProd) vals.push((timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs) ?? null);
+    // The time column shows the lender's machine hours where they changed them.
+    if (isProd) vals.push(r.machine?.current ?? (timeCol ? (r.cells.timeHrs?.original ?? r.timeHrs) : r.timeHrs) ?? null);
     if (r.kind !== 'heading') {
       for (const c of columns) { const cell = r.cells[c.key]; vals.push(cell?.original ?? null, cell?.factor ?? null, cell?.repriced ?? null); }
     }
+    const rowChanges = changes.filter(c => columns.some(col => changeForCell([c], table, r, col.key)) || (r.machine?.edited && c.key === `${r.id}:machineHours`));
+    while (vals.length < noteCol - 1) vals.push(null);
+    vals.push(rowChanges.length ? rowChanges.map(changeSentence).join('; ') : null);
     const row = ws.addRow(vals);
     if (caps || r.kind === 'heading') row.font = { bold: true };
     row.eachCell((cell, col) => {
-      if (col === 1) return;
+      if (col === 1 || col === noteCol) return;
       const label = header[col - 1] ?? '';
       if (label.endsWith('factor')) cell.numFmt = '0.000';
-      else if (typeof cell.value === 'number') cell.numFmt = '#,##0;[Red]-#,##0';
+      else if (isProd && col === 2) cell.numFmt = '0.00;-0.00;;@'; // hours; blank for none, as the study prints it
+      else if (typeof cell.value === 'number') cell.numFmt = USD;
     });
+    if (isProd && r.machine?.edited) { const t = row.getCell(2); t.fill = EDIT_FILL; t.font = { bold: true }; t.note = `Your machine hours (study: ${r.machine.original} hrs)`; }
+    if (rowChanges.length) { const n = row.getCell(noteCol); n.font = { color: { argb: 'FF1447D6' } }; }
     columns.forEach((c, i) => {
       const data = r.cells[c.key];
       if (!data) return;
       const target = row.getCell((isProd ? 3 : 2) + i * 3 + 2);
-      if (data.overridden) target.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4CC' } };
-      target.note = [data.overridden ? 'Lender edit' : data.seriesId ?? 'Calculated or retained study value', data.fallback && !data.overridden ? 'CPI fallback: no specific index matched this label' : '', data.note ?? '', r.sourceNote ?? ''].filter(Boolean).join('\n');
+      const change = data.overridden ? changeForCell(changes, table, r, c.key) : undefined;
+      if (data.overridden) { target.fill = EDIT_FILL; target.font = { bold: true }; }
+      if (data.factorOverridden) { const f = row.getCell((isProd ? 3 : 2) + i * 3 + 1); f.fill = EDIT_FILL; f.font = { bold: true }; }
+      target.note = [data.overridden ? (change ? changeSentence(change) : 'Your change') : data.seriesId ?? 'Calculated or retained study value', data.fallback && !data.overridden ? 'CPI fallback: no specific index matched this label' : '', data.note ?? '', r.sourceNote ?? ''].filter(Boolean).join('\n');
     });
   }
   ws.addRow([]);
@@ -52,6 +74,22 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
   ws.addRow([repricingSentence(table, meta)]);
   ws.addRow([fallbackSentence(table)]);
   ws.getColumn(1).width = 44; for (let c = 2; c <= header.length; c++) ws.getColumn(c).width = 13;
+  ws.getColumn(noteCol).width = 48;
+
+  // Every lender edit, one row each, with the figure before and after.
+  if (changes.length) {
+    const cs = book.addWorksheet('Your changes', { views: [{ state: 'frozen', ySplit: 2 }] });
+    cs.addRow([`Your changes to the study (${changes.length}). Edited cells are highlighted on the Table sheet and named in its Your change column.`]).font = { bold: true };
+    const head = cs.addRow(['Where', 'Column', 'What', 'Before', 'Before is', 'Yours']);
+    head.font = { bold: true }; head.eachCell(cell => { cell.border = { bottom: { style: 'thin' } }; });
+    const fmtOf: Record<UserChange['unit'], string> = { money: USD, money2: USD2, factor: '0.000', hours: '0.00##', number: '#,##0.####', percent: '0.00%' };
+    for (const c of changes) {
+      const row = cs.addRow([c.row, c.column ?? '', c.kind, c.from, c.fromLabel.toLowerCase(), c.to]);
+      [4, 6].forEach(i => { row.getCell(i).numFmt = fmtOf[c.unit]; });
+      row.getCell(6).fill = EDIT_FILL; row.getCell(6).font = { bold: true };
+    }
+    [44, 24, 20, 14, 10, 14].forEach((w, i) => { cs.getColumn(i + 1).width = w; });
+  }
 
   const lines = returnLines(table);
   if (lines.length) {
@@ -62,12 +100,12 @@ export async function buildWorkbook(table: RepricedTable, meta: ExportMeta): Pro
     for (const l of lines) {
       const row = rs.addRow([l.label, l.unit, l.quantity[0], l.quantity[1], l.price[0], l.price[1], l.value[0], l.value[1], l.what, l.page, l.note]);
       [3, 4].forEach(c => { row.getCell(c).numFmt = '#,##0.####'; });
-      [5, 6].forEach(c => { row.getCell(c).numFmt = '#,##0.00##'; });
-      [7, 8].forEach(c => { row.getCell(c).numFmt = '#,##0;[Red]-#,##0'; });
-      const yellow = { type: 'pattern' as const, pattern: 'solid' as const, fgColor: { argb: 'FFFFF4CC' } };
-      if (l.quantity[0] !== l.quantity[1]) row.getCell(4).fill = yellow;
-      if (l.price[0] !== l.price[1]) row.getCell(6).fill = yellow;
-      if (l.edited) row.getCell(8).fill = yellow;
+      [5, 6].forEach(c => { row.getCell(c).numFmt = USD2; });
+      [7, 8].forEach(c => { row.getCell(c).numFmt = USD; });
+      // Only the lender's edits are tinted; a USDA-adjusted price differs from the study without being an edit.
+      if (l.edited && l.quantity[0] !== l.quantity[1]) row.getCell(4).fill = EDIT_FILL;
+      if (l.edited && l.price[0] !== l.price[1]) row.getCell(6).fill = EDIT_FILL;
+      if (l.edited) row.getCell(8).fill = EDIT_FILL;
     }
     [36, 12, 14, 14, 12, 12, 13, 13, 30, 8, 60].forEach((w, i) => { rs.getColumn(i + 1).width = w; });
   }

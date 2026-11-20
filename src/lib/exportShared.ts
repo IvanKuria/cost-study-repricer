@@ -1,6 +1,7 @@
 import type { RepricedRow, RepricedTable, Series, StudyPick } from './types';
 import { MONTHS } from '@/ui';
 import { movedText } from './cropPrices';
+import type { UserChange } from './exportChanges';
 
 export interface ExportMeta {
   sourcesUrl?: string;
@@ -10,6 +11,8 @@ export interface ExportMeta {
   interestSource: string;
   acres: number;
   mappingNotes: { label: string; series: string; note: string }[];
+  /** The lender's edits (exportChanges.ts), listed in a "Your changes" section and flagged on their cells. */
+  changes?: UserChange[];
 }
 
 export const periodText = (p: string) => { const [y, m] = p.split('-'); return `${MONTHS[Number(m) - 1] ?? m} ${y}`; };
