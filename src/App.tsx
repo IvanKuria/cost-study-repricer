@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ParsedStudy } from '@/data/studySchema';
 import type { RepriceSettings, RepricedTable, Series, StudyPick } from '@/lib/types';
-import { DEFAULT_HASH, parseHash, serializeHash, type HashState, type Layout } from '@/lib/hashState';
+import { DEFAULT_HASH, parseHash, serializeHash, type HashState } from '@/lib/hashState';
 import type { ExportMeta } from '@/lib/exportShared';
 import { DEFAULT_MAPPING } from '@/data/mapping';
 import { loadStudy, studyPicks } from '@/lib/studies';
@@ -10,7 +10,7 @@ import { defaultSalePrice, isLaborKey, isReturnKey, mainReturnIndex, repriceStud
 import { CROP_PRICES } from '@/lib/cropPrices';
 import { Card, periodLabel } from '@/ui';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { CapitalRecoveryField, Controls, type ControlsValue } from '@/screens/Controls';
+import { Controls } from '@/screens/Controls';
 import { Summary, type YourPriceProps } from '@/screens/Summary';
 import { StudyTable, type View } from '@/screens/StudyTable';
 import { Notes, mappingNotes } from '@/screens/Notes';
@@ -21,10 +21,6 @@ import { userChanges, type UserChange } from '@/lib/exportChanges';
 import { studyContentsOf } from '@/lib/studyContentsOf';
 
 const RATE_SERIES = 'kcfed.operatingRate';
-
-type Edits = Record<Layout, Record<string, number>>;
-type EditsUpdate = Record<string, number> | ((o: Record<string, number>) => Record<string, number>);
-const NO_EDITS: Edits = { establishment: {}, production: {} };
 
 /** Months every monthly series covers, newest first, from 2010 on. */
 export function commonPeriods(series: Series[]): string[] {
@@ -45,36 +41,24 @@ function latestRate(series: Series[]): { rate: number; period: string } | null {
 export default function App() {
   const picks = useMemo(() => studyPicks(), []);
   // A plain link opens with no crop chosen, so the visitor picks one (Adauto, 2026-11-18); a shared link restores its own.
-  // The layout rides in the hash; a link from before it did opens a study on its establishment table when it has one.
-  const hasEstablishment = (id: string) => picks.find(p => p.id === id)?.hasEstablishment ?? false;
-  const [hash, setHash] = useState<HashState>(() => window.location.hash ? parseHash(window.location.hash, hasEstablishment) : DEFAULT_HASH);
-  const layout = hash.layout;
+  const [hash, setHash] = useState<HashState>(() => window.location.hash ? parseHash(window.location.hash) : DEFAULT_HASH);
+  const [layout, setLayout] = useState<'establishment' | 'production'>('establishment');
   const [price, setPrice] = useState<number | null>(null);
   const series: Series[] = SERIES;
   const [study, setStudy] = useState<ParsedStudy | null>(null);
-  // Typed costs and factors are kept per table, keyed by that table's own row ids, so switching between a study's
-  // establishment and mature production tables keeps the edits made in each.
-  const [overridesBy, setOverridesBy] = useState<Edits>(NO_EDITS);
-  const [factorsBy, setFactorsBy] = useState<Edits>(NO_EDITS);
-  // The layouts this study can show, read from its parsed data. A layout it lacks is never used, even if the manifest
-  // behind the table toggle disagreed.
-  const contents = study && study.source.id === hash.study ? studyContentsOf(study) : null;
-  const shownLayout: Layout = !contents ? layout : layout === 'production' ? (contents.p ? 'production' : 'establishment') : (contents.e ? 'establishment' : 'production');
-  const overrides = overridesBy[shownLayout];
-  const factorOverrides = factorsBy[shownLayout];
-  const setOverrides = (f: EditsUpdate) => setOverridesBy(m => ({ ...m, [shownLayout]: typeof f === 'function' ? f(m[shownLayout]) : f }));
-  const setFactorOverrides = (f: EditsUpdate) => setFactorsBy(m => ({ ...m, [shownLayout]: typeof f === 'function' ? f(m[shownLayout]) : f }));
+  const [overrides, setOverrides] = useState<Record<string, number>>({});
+  const [factorOverrides, setFactorOverrides] = useState<Record<string, number>>({});
   const [view, setView] = useState<View>('today');
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    const onHash = () => setHash(parseHash(window.location.hash, hasEstablishment));
+    const onHash = () => setHash(parseHash(window.location.hash));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => { const next = serializeHash(hash); if (next !== window.location.hash) history.replaceState(null, '', next || window.location.pathname); }, [hash]);
   useEffect(() => {
-    setOverridesBy(NO_EDITS); setFactorsBy(NO_EDITS); setPrice(null); setLoadError(null); setStudy(null);
+    setOverrides({}); setFactorOverrides({}); setPrice(null); setLoadError(null); setStudy(null);
     if (!hash.study) { setStudy(null); return; }
     let live = true;
     loadStudy(hash.study).then(s => { if (live) setStudy(s); }).catch(e => { if (live) setLoadError(String(e)); });
@@ -102,8 +86,7 @@ export default function App() {
     const next = value === defaultPrice ? null : value;
     if (sharedKey) setReturnEdits(r => { const n = { ...r }; delete n[returnKey(mainLine, 'total')]; if (next === null) delete n[sharedKey]; else n[sharedKey] = next; return n; });
     else setPrice(next);
-    // Typed establishment income follows from the price, so it clears whichever table the price was changed from.
-    setOverridesBy(m => ({ ...m, establishment: Object.fromEntries(Object.entries(m.establishment).filter(([key]) => !key.startsWith('income:'))) }));
+    setOverrides(o => Object.fromEntries(Object.entries(o).filter(([key]) => !key.startsWith('income:'))));
   };
   /** A return line edit: typing the value clears that line's price and quantity edits, and the other way round. */
   const changeReturn = (key: string, value: number | null) => setReturnEdits(r => {
@@ -115,6 +98,9 @@ export default function App() {
   });
   const allOverrides = useMemo(() => ({ ...overrides, ...returnEdits }), [overrides, returnEdits]);
 
+  // The layouts this study can show, read from its parsed data. A layout it lacks is never offered or used.
+  const contents = study && study.source.id === hash.study ? studyContentsOf(study) : null;
+  const shownLayout: 'establishment' | 'production' = !contents ? layout : layout === 'production' ? (contents.p ? 'production' : 'establishment') : (contents.e ? 'establishment' : 'production');
   const settings: RepriceSettings | null = target ? {
     layout: shownLayout, factorOverrides,  pricePerUnit: price, targetPeriod: target, referenceMonth: 6, interestRate: hash.rate ?? rateInfo?.rate ?? null, capitalRecoveryRate: hash.crRate, overrides: allOverrides, mapping: DEFAULT_MAPPING, cropPrices: CROP_PRICES,
   } : null;
@@ -195,7 +181,7 @@ export default function App() {
     });
     if (prodRow && col === 'labor' && value !== null) setReturnEdits(r => { const n = { ...r }; delete n[`${id}:laborHours`]; return n; });
   };
-  const resetAll = () => { setOverridesBy(NO_EDITS); setFactorsBy(NO_EDITS); setPrice(null); setHash(h => ({ ...h, returns: {}, rate: null, crRate: null, acres: 1 })); };
+  const resetAll = () => { setOverrides({}); setFactorOverrides({}); setPrice(null); setHash(h => ({ ...h, returns: {}, rate: null, crRate: null, acres: 1 })); };
   const changes: UserChange[] = table ? userChanges(table, studyHere, {
     overrides, factorOverrides, returns: returnEdits, price, studyPrice: studySalePrice(studyHere),
     rate: hash.rate, rateDefault: rateInfo?.rate ?? null, crRate: hash.crRate, crRateDefault: crRateDefault, acres: hash.acres,
@@ -210,12 +196,6 @@ export default function App() {
     else if (c.store === 'crRate') setHash(h => ({ ...h, crRate: null }));
     else if (c.store === 'acres') setHash(h => ({ ...h, acres: 1 }));
   };
-  const controls: ControlsValue = { layout: hash.layout, crop: hash.crop, study: hash.study, target, rate: hash.rate, crRate: hash.crRate, acres: hash.acres };
-  const changeControls = (v: ControlsValue) => {
-    // Switching tables keeps every edit: return lines, wages and hours ride in the hash, typed costs and factors are kept per table.
-    setHash(h => ({ ...DEFAULT_HASH, ...v, returns: v.study === h.study ? h.returns : {} }));
-  };
-  const wageLabor = table?.layout === 'production' ? table.labor ?? null : null;
   const dataDate = series.filter(s => s.frequency === 'monthly').map(s => s.lastPeriod).sort().reverse()[0] ?? null;
 
   if (new URLSearchParams(window.location.search).get('section') === 'sources' && table && meta) return <main className="mx-auto max-w-4xl p-5"><h1 className="text-2xl font-bold mb-4">Sources and calculations</h1><p className="mb-4">Adjustment factor = selected month’s index ÷ study-period index. Adjusted cost = study cost × factor. Automatic production totals combine the adjusted components.</p><Notes table={table} meta={meta} study={pick} mapping={DEFAULT_MAPPING} series={meta.series} sourcesOpen /></main>;
@@ -225,7 +205,7 @@ export default function App() {
       <div className="min-h-dvh">
         <header className="bg-ground border-b border-line">
           <div className="mx-auto max-w-[1240px] px-5 h-14 flex items-center gap-4">
-            <h1 className="font-bold text-[17px] tracking-tight">Cost Study Repricer</h1>
+            <div className="font-bold text-[17px] tracking-tight">Cost study repricer</div>
             <div className="ml-auto text-[13px] text-ink-2 text-right leading-tight">
               {target && <div>Target month: <span className="text-ink font-medium">{periodLabel(target)}</span></div>}
               {dataDate && <div>Series through {periodLabel(dataDate)}</div>}
@@ -234,17 +214,24 @@ export default function App() {
         </header>
         <main className="mx-auto max-w-[1240px] px-5 py-6 space-y-6">
           <Card className="p-5">
-            <Controls value={controls} onChange={changeControls} picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource} />
-            {/* Settings only a mature production table uses: its wages and, where it recalculates the establishment charge, that rate. */}
-            {(wageLabor || crRateDefault !== null) && <div className="mt-4 border-t border-line pt-3 flex flex-wrap items-start gap-x-8 gap-y-4">
-              {wageLabor && <div className="flex-1 min-w-0 basis-[28rem]"><WageInput labor={wageLabor} onOverride={editLine} /></div>}
-              {crRateDefault !== null && <CapitalRecoveryField className="w-full sm:w-60" value={controls} onChange={changeControls} crRateDefault={crRateDefault} crRateSource={crRateSource} />}
-            </div>}
+            <Controls
+              value={{ crop: hash.crop, study: hash.study, target, rate: hash.rate, crRate: hash.crRate, acres: hash.acres }}
+              onChange={v => setHash(h => ({ ...DEFAULT_HASH, ...v, returns: v.study === h.study ? h.returns : {} }))}
+              picks={picks} periods={periods} rateDefault={rateInfo?.rate ?? null} rateSource={rateSource} crRateDefault={crRateDefault} crRateSource={crRateSource}
+            />
+            {table?.layout === 'production' && table.labor && <div className="mt-4 border-t border-line pt-3"><WageInput labor={table.labor} onOverride={editLine} /></div>}
           </Card>
           {(loadError || calculation.error) && <p role="alert" className="text-loss text-[14px]">{loadError || calculation.error}</p>}
           {!hash.study && <p className="text-ink-2">Pick a crop and a study. The study's cost table appears here, repriced to the target month, and every line can be edited.</p>}
           {table && meta && (
             <>
+              {/* Only the layouts the study holds are offered; a study with one shows which one it has. */}
+              {contents && <div className="max-w-md space-y-2">
+                {contents.e && contents.p
+                  ? <div className="flex flex-wrap gap-2">{(['establishment', 'production'] as const).map(l => <button key={l} type="button" aria-pressed={table.layout === l} aria-describedby="table-stage-description" onClick={() => { if (l !== table.layout) { setLayout(l); setOverrides({}); setFactorOverrides({}); } }} className={`h-9 px-4 rounded-full border transition-colors duration-150 ${table.layout === l ? 'border-accent bg-accent-soft text-accent-deep' : 'border-line hover:border-accent'}`}>{l === 'establishment' ? 'Planting & early years' : 'Mature production'}</button>)}</div>
+                  : <div className="text-[14px] font-medium">{table.layout === 'establishment' ? 'Planting & early years' : 'Mature production'}</div>}
+                <p id="table-stage-description" className="text-[13px] text-ink-3">{table.layout === 'establishment' ? 'Costs and income by year, from planting through early harvests.' : 'Costs and income for one typical year at full production.'}{!(contents.e && contents.p) && ` This study has ${contents.e ? 'no mature production table' : 'no establishment table'}.`}</p>
+              </div>}
               <Card className="p-5 space-y-4"><Summary table={table} acres={hash.acres} price={yourPrice} /></Card>
               <Card className="p-5 space-y-4 min-w-0">
                 <YourChanges changes={changes} onReset={resetChange} onResetAll={resetAll} />

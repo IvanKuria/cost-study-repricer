@@ -3,7 +3,7 @@ import { parseHash, serializeHash } from './hashState';
 
 describe('hash state', () => {
   it('round-trips the five controls', () => {
-    const s = { layout: 'production' as const, crop: 'almonds', study: 'almonds-2024-almondssjvsouth-final-draft-8-3-25', target: '2026-07', rate: 0.0751, crRate: 0.065, acres: 40, returns: {} };
+    const s = { crop: 'almonds', study: 'almonds-2024-almondssjvsouth-final-draft-8-3-25', target: '2026-07', rate: 0.0751, crRate: 0.065, acres: 40, returns: {} };
     const h = serializeHash(s);
     expect(h).toContain('crop=almonds');
     expect(h).toContain('rate=7.51');
@@ -11,11 +11,11 @@ describe('hash state', () => {
     expect(parseHash(h)).toEqual(s);
   });
   it('defaults acres to 1, rate to the study rate, and ignores bad targets', () => {
-    expect(parseHash('#crop=lettuce&target=july&acres=-3')).toEqual({ layout: 'production', crop: 'lettuce', study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} });
-    expect(serializeHash({ layout: 'production', crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} })).toBe('');
+    expect(parseHash('#crop=lettuce&target=july&acres=-3')).toEqual({ crop: 'lettuce', study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} });
+    expect(serializeHash({ crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} })).toBe('');
   });
   it('round-trips return line edits and a gross returns override, and drops unknown or bad ones', () => {
-    const s = { layout: 'production' as const, crop: 'cotton', study: 'cotton-cotton2012pima', target: null, rate: null, crRate: null, acres: 1, returns: { 'ret-0:price': 1.42, 'ret-1:quantity': 3.5, 'ret-10:total': 220, 'gross:total': 2100 } };
+    const s = { crop: 'cotton', study: 'cotton-cotton2012pima', target: null, rate: null, crRate: null, acres: 1, returns: { 'ret-0:price': 1.42, 'ret-1:quantity': 3.5, 'ret-10:total': 220, 'gross:total': 2100 } };
     const h = serializeHash(s);
     expect(h).toContain('ret-0.price=1.42');
     expect(h).toContain('ret-1.quantity=3.5');
@@ -25,7 +25,7 @@ describe('hash state', () => {
   });
 
   it('round-trips labor hours and wage edits, and drops mixed or bad keys', () => {
-    const s = { layout: 'production' as const, crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-3:laborHours': 1.5, 'wage:machine': 31.25, 'wage:general': 24 } };
+    const s = { crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-3:laborHours': 1.5, 'wage:machine': 31.25, 'wage:general': 24 } };
     const h = serializeHash(s);
     expect(h).toContain('op-3.laborHours=1.5');
     expect(h).toContain('wage.machine=31.25');
@@ -34,24 +34,10 @@ describe('hash state', () => {
   });
 
   it('round-trips machine hours edits so a shared link carries them', () => {
-    const s = { layout: 'production' as const, crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-2:machineHours': 0.8, 'op-2:laborHours': 1.1 } };
+    const s = { crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: { 'op-2:machineHours': 0.8, 'op-2:laborHours': 1.1 } };
     const h = serializeHash(s);
     expect(h).toContain('op-2.machineHours=0.8');
     expect(parseHash(h)).toEqual(s);
     expect(parseHash('#ret-0.machineHours=1&op-1.machineHrs=1').returns).toEqual({});
-  });
-
-  it('carries the layout, and reads older links without it as they used to open', () => {
-    const s = { layout: 'establishment' as const, crop: 'almonds', study: 'a', target: null, rate: null, crRate: null, acres: 1, returns: {} };
-    expect(serializeHash(s)).toContain('layout=establishment');
-    expect(parseHash(serializeHash(s))).toEqual(s);
-    expect(parseHash(serializeHash({ ...s, layout: 'production' }), () => true).layout).toBe('production');
-    // Older links opened a study on its establishment table when it had one, else on mature production.
-    expect(parseHash('#crop=almonds&study=a', id => id === 'a').layout).toBe('establishment');
-    expect(parseHash('#crop=apples&study=b', id => id === 'a').layout).toBe('production');
-    expect(parseHash('#crop=almonds').layout).toBe('production');
-    expect(parseHash('').layout).toBe('production');
-    // With no crop chosen, the establishment toggle still survives a reload.
-    expect(serializeHash({ ...s, crop: null, study: null })).toBe('#layout=establishment');
   });
 });

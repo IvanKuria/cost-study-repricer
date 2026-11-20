@@ -1,10 +1,6 @@
 // The controls live in the URL hash so a loan officer can paste one link into a credit memo.
 
-/** Which of a study's two tables is shown: the establishment years or one typical year of mature production. */
-export type Layout = 'establishment' | 'production';
-
 export interface HashState {
-  layout: Layout;
   crop: string | null;
   study: string | null;
   target: string | null;     // 'YYYY-MM'
@@ -17,18 +13,13 @@ export interface HashState {
   // Labor edits ride along the same way: 'op-3:laborHours' is 'op-3.laborHours=1.5', 'wage:machine' is 'wage.machine=31.5'.
 }
 
-export const DEFAULT_HASH: HashState = { layout: 'production', crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} };
+export const DEFAULT_HASH: HashState = { crop: null, study: null, target: null, rate: null, crRate: null, acres: 1, returns: {} };
 
 // Machine time edits too: 'op-3:machineHours' is 'op-3.machineHours=0.8'.
 const RETURN_PARAM = /^(ret-\d+|gross)\.(price|quantity|total)$|^(op-\d+)\.(laborHours|machineHours)$|^(wage)\.(machine|general)$/;
 
-/** `hasEstablishment(id)` says whether a study holds an establishment table. Links made before the layout was in the hash
- *  opened a study on its establishment table when it had one, so a study link without `layout` still does. */
-export function parseHash(hash: string, hasEstablishment: (study: string) => boolean = () => false): HashState {
+export function parseHash(hash: string): HashState {
   const q = new URLSearchParams(hash.replace(/^#/, ''));
-  const study = q.get('study');
-  const named = q.get('layout');
-  const layout: Layout = named === 'establishment' || named === 'production' ? named : study && hasEstablishment(study) ? 'establishment' : 'production';
   const rate = q.get('rate');
   const crRate = q.get('crrate');
   const pctOf = (v: string | null) => v !== null && v !== '' && Number.isFinite(Number(v)) ? Number(v) / 100 : null;
@@ -39,9 +30,8 @@ export function parseHash(hash: string, hasEstablishment: (study: string) => boo
     if (m && v !== '' && Number.isFinite(Number(v))) returns[k.replace('.', ':')] = Number(v);
   }
   return {
-    layout,
     crop: q.get('crop'),
-    study,
+    study: q.get('study'),
     target: /^\d{4}-\d{2}$/.test(q.get('target') ?? '') ? q.get('target') : null,
     rate: pctOf(rate),
     crRate: pctOf(crRate),
@@ -52,9 +42,6 @@ export function parseHash(hash: string, hasEstablishment: (study: string) => boo
 
 export function serializeHash(s: HashState): string {
   const q = new URLSearchParams();
-  // The layout is written whenever a crop or study is, so a new link never takes the legacy reading above, and whenever it
-  // is not the default.
-  if (s.crop || s.study || s.layout !== DEFAULT_HASH.layout) q.set('layout', s.layout);
   if (s.crop) q.set('crop', s.crop);
   if (s.study) q.set('study', s.study);
   if (s.target) q.set('target', s.target);
